@@ -12,7 +12,9 @@ from app.dependencies.user_dependencies import (
 from app.schemas.user_schema import User, UserCreate, UserResponse, UserRole, UserUpdate
 from app.services import user_service
 
-router = APIRouter(prefix="/users", dependencies=[Depends(set_api_headers)])
+router = APIRouter(
+    prefix="/users", tags=["Users"], dependencies=[Depends(set_api_headers)]
+)
 
 
 @router.get("", response_model=list[UserResponse], status_code=status.HTTP_200_OK)

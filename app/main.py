@@ -1,10 +1,7 @@
 from fastapi import FastAPI
 
-from app.database.connection import Base, engine
-from app.models import user_model  # noqa: F401  (registra el modelo en Base.metadata)
 from app.routes.user_routes import router as user_router
 
-Base.metadata.create_all(bind=engine)
 
 tags_metadata = [
     {

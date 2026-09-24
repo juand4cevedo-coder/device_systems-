@@ -227,3 +227,27 @@ Los commits siguen Conventional Commits: `tipo(scope): descripción` (por ejempl
 ## Reflexión sobre FastAPI (EV07)
 
 FastAPI permitió construir la API de `users` con poco código: los path y query parameters se declaran como argumentos de las funciones, Pydantic valida los datos de entrada y los `response_model` controlan lo que la API devuelve, todo apoyado en los tipos de Python. Además, la documentación interactiva se genera automáticamente y sirvió para probar cada endpoint sin herramientas externas. [Completa con lo que más te sirvió o te costó aprender.]
+
+## Códigos de estado usados
+
+| Operación | Método y ruta | Código |
+|---|---|---|
+| Listar usuarios | `GET /users` | 200 OK |
+| Consultar usuario | `GET /users/{user_id}` | 200 OK |
+| Crear usuario | `POST /users` | 201 Created |
+| Actualizar completo | `PUT /users/{user_id}` | 200 OK |
+| Actualizar parcial | `PATCH /users/{user_id}` | 200 OK |
+| Eliminar usuario | `DELETE /users/{user_id}` | 204 No Content |
+| Usuario no encontrado | Cualquier método por ID | 404 Not Found |
+| Correo duplicado | `POST`, `PUT` y `PATCH` | 400 Bad Request |
+| Actualización sin datos | `PATCH /users/{user_id}` | 400 Bad Request |
+| Datos inválidos | Validación Pydantic | 422 Unprocessable Entity |
+
+## Manejo de errores
+
+| Caso | Código | Respuesta |
+|---|---|---|
+| Usuario no encontrado (incluye eliminar o actualizar uno inexistente) | 404 | `{"detail": "Usuario no encontrado"}` |
+| Correo duplicado | 400 | `{"detail": "El correo ya está registrado"}` |
+| PATCH sin ningún campo | 400 | `{"detail": "Debe enviar al menos un campo para actualizar"}` |
+| Rol no permitido o datos inválidos | 422 | Lista de errores de validación de Pydantic en `detail` |

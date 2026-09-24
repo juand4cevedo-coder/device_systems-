@@ -139,7 +139,7 @@ Las respuestas exitosas incluyen estas cabeceras personalizadas:
 | Cabecera | Valor |
 |---|---|
 | `X-App-Name` | `device_systems` |
-| `X-API-Version` | `1.0` |
+| `X-API-Version` | `2.0` |
 
 ## Estructura del proyecto
 
@@ -251,3 +251,22 @@ FastAPI permitió construir la API de `users` con poco código: los path y query
 | Correo duplicado | 400 | `{"detail": "El correo ya está registrado"}` |
 | PATCH sin ningún campo | 400 | `{"detail": "Debe enviar al menos un campo para actualizar"}` |
 | Rol no permitido o datos inválidos | 422 | Lista de errores de validación de Pydantic en `detail` |
+
+## Dependency Injection con Depends()
+
+FastAPI resuelve las dependencias declaradas con `Depends()` antes de ejecutar cada endpoint. Las funciones reutilizables viven en `app/dependencies/user_dependencies.py`:
+
+| Dependencia | Qué hace | Dónde se usa |
+|---|---|---|
+| `set_api_headers` | Agrega `X-App-Name` y `X-API-Version` a cada respuesta | Todo el router `/users` |
+| `get_user_or_404` | Busca el usuario por ID o lanza 404 | GET, PUT, PATCH y DELETE por ID |
+| `validate_new_user` | Valida el body del POST y que el correo no esté registrado (400) | POST |
+| `validate_user_replacement` | Valida el body del PUT y que el correo no sea de otro usuario (400) | PUT |
+| `validate_user_changes` | Valida el body del PATCH, rechaza el PATCH vacío (400) y el correo de otro usuario (400) | PATCH |
+
+Ventajas de este enfoque:
+
+- La lógica de validación se escribe una sola vez y se reutiliza en varios endpoints.
+- Las rutas quedan cortas y solo llaman al servicio.
+- FastAPI ejecuta cada dependencia una sola vez por petición, aunque varias la declaren.
+- Los errores (`HTTPException`) se lanzan desde las dependencias, por lo que todos los endpoints responden igual ante el mismo caso.

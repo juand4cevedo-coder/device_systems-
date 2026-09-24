@@ -1,6 +1,6 @@
 # device_systems
 
-API REST para la gestión de usuarios del sistema device_systems, construida con FastAPI. Implementa el CRUD completo del recurso `users`, con validación de datos (Pydantic v2), manejo de errores con códigos HTTP, dependencias reutilizables (`Depends()`) y documentación automática con Swagger/OpenAPI.
+API REST para la gestión de usuarios, dispositivos y préstamos del sistema device_systems, construida con FastAPI. Implementa el CRUD completo de usuarios y dispositivos, la gestión de préstamos con reglas de negocio, consultas con joins y filtros avanzados, validación de datos (Pydantic v2), manejo de errores con códigos HTTP, dependencias reutilizables (`Depends()`), persistencia con SQLAlchemy y SQLite, migraciones con Alembic y documentación automática con Swagger/OpenAPI.
 
 ## Tecnologías utilizadas
 
@@ -13,6 +13,7 @@ API REST para la gestión de usuarios del sistema device_systems, construida con
 - Git, GitHub y GitFlow: control de versiones
 - [SQLAlchemy](https://www.sqlalchemy.org/): ORM para la persistencia de datos
 - SQLite: base de datos relacional de desarrollo
+- [Alembic](https://alembic.sqlalchemy.org/): migraciones de la base de datos
 
 ## Requisitos
 
@@ -42,36 +43,54 @@ device_systems/
 ├── app/
 │   ├── main.py
 │   ├── database/
-│   │   └── connection.py
+│   │   ├── connection.py
+│   │   └── migration_check.py
 │   ├── models/
-│   │   └── user_model.py
+│   │   ├── user_model.py
+│   │   ├── device_model.py
+│   │   └── loan_model.py
 │   ├── schemas/
-│   │   └── user_schema.py
+│   │   ├── user_schema.py
+│   │   ├── device_schema.py
+│   │   ├── loan_schema.py
+│   │   └── error_schema.py
 │   ├── routes/
-│   │   └── user_routes.py
+│   │   ├── user_routes.py
+│   │   ├── device_routes.py
+│   │   └── loan_routes.py
 │   ├── services/
-│   │   └── user_service.py
+│   │   ├── user_service.py
+│   │   ├── device_service.py
+│   │   └── loan_service.py
 │   └── dependencies/
 │       ├── database_dependency.py
-│       └── user_dependencies.py
+│       ├── user_dependencies.py
+│       ├── device_dependencies.py
+│       └── loan_dependencies.py
+├── alembic/
+│   ├── env.py
+│   └── versions/
 ├── docs/
 │   └── images/
+├── alembic.ini
 ├── CHANGELOG.md
 ├── pyproject.toml
 ├── requirements.txt
 └── README.md
 ```
 
-`device_systems.db` se genera al iniciar la aplicación y no se versiona.
+`device_systems.db` se genera al aplicar las migraciones y no se versiona.
 
 | Carpeta | Responsabilidad |
 |---|---|
-| `database` | Conexión a la base de datos: engine, sesión y base declarativa |
-| `models` | Modelos SQLAlchemy: tablas de la base de datos |
-| `schemas` | Modelos Pydantic de entrada y salida |
+| `database` | Conexión a la base de datos (engine, sesión, base declarativa) y comprobación de migraciones al arrancar |
+| `models` | Modelos SQLAlchemy: tablas `users`, `devices` y `loans` y sus relaciones |
+| `schemas` | Modelos Pydantic de entrada y salida, y el formato de los errores |
 | `routes` | Definición de endpoints |
 | `services` | Lógica de negocio y consultas a la base de datos |
-| `dependencies` | Funciones reutilizables con `Depends()`, incluida la sesión de base de datos |
+| `dependencies` | Funciones reutilizables con `Depends()`: sesión, búsquedas por ID, validaciones y reglas de negocio |
+| `alembic` | Migraciones que versionan el esquema de la base de datos |
+
 
 ## Base de datos (SQLAlchemy)
 
@@ -612,6 +631,76 @@ Los commits siguen Conventional Commits: `tipo(scope): descripción` (por ejempl
 ![Error 404 al eliminar](docs/images/ev09/21-error-404-delete-nonexistent.png)
 *Eliminar un usuario inexistente: 404 Not Found.*
 
+## Evidencias de pruebas (EV10)
+
+### Alembic y base de datos
+
+![alembic init](docs/images/ev10/01-alembic-init.png)
+*Inicialización de Alembic con `alembic init alembic`.*
+
+![alembic revision --autogenerate](docs/images/ev10/02-alembic-revision-autogenerate.png)
+*Generación de la migración `create devices and loans tables`.*
+
+![alembic upgrade head](docs/images/ev10/03-alembic-upgrade-head.png)
+*Aplicación de la migración con `alembic upgrade head`.*
+
+![alembic history](docs/images/ev10/04-alembic-history.png)
+*Historial de migraciones con `alembic history`.*
+
+![Estructura de las tablas](docs/images/ev10/05-database-tables-structure.png)
+*Tablas `users`, `devices` y `loans` generadas, con sus claves foráneas.*
+
+### Swagger UI y ReDoc
+
+![Swagger UI: vista general](docs/images/ev10/06-swagger-overview.png)
+*Grupos `Users`, `Devices` y `Loans` en `/docs`, versión 2.2.0.*
+
+![Swagger UI: schemas](docs/images/ev10/07-swagger-schemas.png)
+*Schemas de dispositivos, préstamos y errores.*
+
+![Swagger UI: respuestas de POST /loans](docs/images/ev10/08-swagger-loans-errors.png)
+*Códigos de respuesta esperados de `POST /loans`.*
+
+![ReDoc](docs/images/ev10/09-redoc-overview.png)
+*Documentación en `/redoc`.*
+
+### Pruebas funcionales mínimas
+
+![Test 2](docs/images/ev10/10-test02-create-user.png)
+*2. Crear un usuario: 201 Created.*
+
+![Test 3](docs/images/ev10/11-test03-create-device.png)
+*3. Crear un dispositivo: 201 Created.*
+
+![Test 4](docs/images/ev10/12-test04-create-loan.png)
+*4. Crear un préstamo: 201 Created, con estado `active`.*
+
+![Test 5](docs/images/ev10/13-test05-device-unavailable-409.png)
+*5. Intentar prestar un dispositivo no disponible: 409 Conflict.*
+
+![Test 6](docs/images/ev10/14-test06-loans-details-join.png)
+*6. Listar préstamos con la información del usuario y del dispositivo (consulta con `JOIN`).*
+
+![Test 7](docs/images/ev10/15-test07-filter-by-status.png)
+*7. Filtrar préstamos por estado.*
+
+![Test 8](docs/images/ev10/16-test08-filter-by-device-type.png)
+*8. Filtrar préstamos por tipo de dispositivo.*
+
+![Test 9](docs/images/ev10/17-test09-user-loans.png)
+*9. Consultar los préstamos de un usuario.*
+
+![Test 10](docs/images/ev10/18-test10-return-device.png)
+*10. Devolver un dispositivo: el préstamo pasa a `returned`.*
+
+![Test 11](docs/images/ev10/19-test11-device-available-again.png)
+*11. El dispositivo vuelve a estar disponible.*
+
+![Test 12](docs/images/ev10/20-test12-device-loan-history.png)
+*12. Historial de préstamos del dispositivo.*
+
+La prueba 1, ejecutar las migraciones con Alembic, está documentada en la sección "Alembic y base de datos".
+
 ## Evidencias de pruebas (EV08)
 
 Pruebas funcionales de los seis endpoints y de los escenarios de error, ejecutadas desde Swagger UI, ReDoc y Thunder Client.
@@ -721,3 +810,5 @@ En EV07 la API solo permitía consultar y crear usuarios, con todo el código en
 
 FastAPI permitió construir la API de `users` con poco código: los path y query parameters se declaran como argumentos de las funciones, Pydantic valida los datos de entrada y los `response_model` controlan lo que la API devuelve, todo apoyado en los tipos de Python. Además, la documentación interactiva se genera automáticamente y sirvió para probar cada endpoint sin herramientas externas. [Completa con lo que más te sirvió o te costó aprender.]
 
+
+El trabajo de EV10 se desarrolló en la rama `device_systems_alembic_relaciones`, nombre exigido por la guía, que se integra a `develop` y llega a `main` con el release `2.2.0`.

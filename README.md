@@ -20,3 +20,13 @@ uv run uvicorn app.main:app --reload
 ```
 
 Documentación interactiva: http://127.0.0.1:8000/docs
+
+## Modelo de usuario
+
+| Campo | Tipo | Validación |
+|---|---|---|
+| id | int | Asignado por el sistema |
+| name | str | Obligatorio, mínimo 3 caracteres |
+| email | str | Formato de correo válido |
+| role | str | `admin`, `support` o `user` |
+| is_active | bool | Booleano (por defecto `true`) |

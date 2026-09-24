@@ -52,3 +52,21 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Fixed
 - Referencia del README a una captura de EV08 que no forma parte de las evidencias.
+
+## [2.2.0] - AAAA-MM-DD
+
+### Added
+- Migraciones con Alembic: configuración con la metadata del proyecto, modo batch para SQLite y las migraciones `create users table` y `create devices and loans tables` (EV10).
+- Modelos `Device` y `Loan`, con las relaciones `User.loans`, `Device.loans`, `Loan.user` y `Loan.device`, e integridad referencial mediante claves foráneas activadas en SQLite.
+- CRUD de dispositivos (`/devices`) con los filtros `device_type`, `is_available`, `brand` y `search`.
+- Gestión de préstamos: `POST /loans`, `GET /loans`, `GET /loans/{loan_id}` y `PATCH /loans/{loan_id}/return`, con reglas de negocio sobre disponibilidad y devolución.
+- Consultas con joins y filtros: `GET /loans/details`, `GET /users/{user_id}/loans` y `GET /devices/{device_id}/loans`, con los filtros `status`, `user_id`, `device_id`, `user_email`, `device_type`, `date_from` y `date_to`.
+- Schemas de dispositivos y préstamos, schema `ErrorResponse`, ejemplos en los schemas y respuestas de error documentadas en OpenAPI.
+- Comprobación de migraciones al iniciar: la API no arranca si la base de datos no está en la última revisión.
+- Evidencias de pruebas, estructura del proyecto y reflexión de EV10 en el README.
+
+### Changed
+- El esquema de la base de datos lo gestiona Alembic en lugar de `create_all`: la base se crea con `uv run alembic upgrade head`.
+- Eliminar un usuario o un dispositivo con préstamos registrados responde `409 Conflict`.
+- Cabecera `X-API-Version` actualizada a `2.2`.
+- README reorganizado en un orden de lectura más claro.

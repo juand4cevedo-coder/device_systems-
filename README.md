@@ -105,16 +105,30 @@ Las respuestas exitosas incluyen estas cabeceras personalizadas:
 device_systems/
 ├── app/
 │   ├── main.py
+│   ├── routes/
+│   │   └── user_routes.py
 │   ├── schemas/
 │   │   └── user_schema.py
-│   └── routes/
-│       └── user_routes.py
+│   ├── services/
+│   │   └── user_service.py
+│   ├── dependencies/
+│   │   └── user_dependencies.py
+│   └── data/
+│       └── users_db.py
 ├── docs/
 │   └── images/
-│       └── ev07/
 ├── pyproject.toml
+├── requirements.txt
 └── README.md
 ```
+
+| Carpeta | Responsabilidad |
+|---|---|
+| `routes` | Definición de endpoints |
+| `schemas` | Modelos Pydantic de entrada y salida |
+| `services` | Lógica de negocio |
+| `dependencies` | Funciones reutilizables con `Depends()` |
+| `data` | Simulación de base de datos en memoria |
 
 ## Flujo de trabajo Git
 

@@ -575,3 +575,61 @@ Ejemplo de `LoanDetailResponse`:
   }
 }
 ```
+
+## Endpoints de dispositivos
+
+| Método | Ruta | Descripción | Parámetros |
+|---|---|---|---|
+| GET | `/devices` | Lista dispositivos | Query opcionales: `device_type`, `is_available`, `brand`, `search` |
+| GET | `/devices/{device_id}` | Consulta un dispositivo por ID | Path: `device_id` (int) |
+| POST | `/devices` | Registra un dispositivo | Body JSON: `name`, `serial_number`, `device_type`, `brand` (opcional) |
+| PUT | `/devices/{device_id}` | Reemplaza por completo un dispositivo | Path: `device_id`. Body: los mismos campos |
+| PATCH | `/devices/{device_id}` | Actualiza parcialmente un dispositivo | Path: `device_id`. Body: uno o más campos |
+| DELETE | `/devices/{device_id}` | Elimina un dispositivo | Path: `device_id` |
+
+### Filtros de `GET /devices`
+
+| Parámetro | Ejemplo | Comportamiento |
+|---|---|---|
+| `device_type` | `?device_type=laptop` | Tipo exacto, sin distinguir mayúsculas |
+| `is_available` | `?is_available=true` | Dispositivos disponibles o prestados |
+| `brand` | `?brand=lenovo` | Marca exacta, sin distinguir mayúsculas |
+| `search` | `?search=thinkpad` | Texto contenido en el nombre, el número de serie, el tipo o la marca (`ilike` combinado con `or_`) |
+
+Los filtros se pueden combinar: `GET /devices?device_type=laptop&is_available=true`.
+
+### Ejemplos de peticiones
+
+```bash
+curl -X POST http://127.0.0.1:8000/devices \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Laptop Lenovo ThinkPad", "serial_number": "LEN-2024-001", "device_type": "laptop", "brand": "Lenovo"}'
+
+curl "http://127.0.0.1:8000/devices?brand=lenovo"
+curl "http://127.0.0.1:8000/devices?search=thinkpad"
+```
+
+Respuesta `201 Created` del POST:
+
+```json
+{
+  "id": 1,
+  "name": "Laptop Lenovo ThinkPad",
+  "serial_number": "LEN-2024-001",
+  "device_type": "laptop",
+  "brand": "Lenovo",
+  "is_available": true,
+  "created_at": "2026-09-24T15:04:05.123456"
+}
+```
+
+### Respuestas de error
+
+| Código | Caso |
+|---|---|
+| 404 Not Found | El dispositivo no existe |
+| 400 Bad Request | El número de serie ya está registrado, o el PATCH no trae ningún campo |
+| 409 Conflict | El dispositivo tiene préstamos registrados y no se puede eliminar |
+| 422 Unprocessable Entity | Datos inválidos o campos obligatorios ausentes |
+
+El número de serie se compara sin distinguir mayúsculas. `is_available` no se envía en las peticiones: cambia con los préstamos. Para quitar la marca de un dispositivo se usa el PUT, porque el PATCH ignora los campos vacíos.

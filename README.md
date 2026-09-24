@@ -263,6 +263,7 @@ FastAPI resuelve las dependencias declaradas con `Depends()` antes de ejecutar c
 | `validate_new_user` | Valida el body del POST y que el correo no esté registrado (400) | POST |
 | `validate_user_replacement` | Valida el body del PUT y que el correo no sea de otro usuario (400) | PUT |
 | `validate_user_changes` | Valida el body del PATCH, rechaza el PATCH vacío (400) y el correo de otro usuario (400) | PATCH |
+| `get_db` | Entrega una sesión de base de datos por petición y la cierra al terminar | Endpoints y demás dependencias, compartida en una misma petición |
 
 Ventajas de este enfoque:
 
@@ -325,6 +326,24 @@ La persistencia usa SQLAlchemy con SQLite. El archivo `device_systems.db` se cre
 | Clases | `User` | `UserCreate`, `UserUpdate`, `UserPatch`, `UserResponse` |
 
 Se mantienen separados para que la base de datos y el contrato de la API puedan evolucionar de forma independiente. Por ejemplo, el modelo puede tener columnas que la API no expone. `UserResponse` usa `from_attributes=True` para convertir un objeto del modelo en la respuesta de la API.
+
+## Operaciones CRUD sobre la base de datos
+
+Los servicios de `app/services/user_service.py` reciben la sesión de base de datos y ejecutan las consultas con SQLAlchemy:
+
+| Operación | Función |
+|---|---|
+| Crear usuario | `create_user` |
+| Listar usuarios | `list_users` |
+| Buscar usuario por ID | `get_user_by_id` |
+| Buscar usuario por email | `get_user_by_email` |
+| Actualizar usuario completo | `update_user` (PUT: todos los campos) |
+| Actualizar usuario parcial | `update_user` (PATCH: solo los campos enviados) |
+| Eliminar usuario | `delete_user` |
+| Filtrar por rol y por estado | `list_users(role=..., is_active=...)` |
+| Ordenar por nombre o fecha de creación | `list_users(order_by=...)` |
+
+Los datos persisten entre reinicios del servidor. La base de datos comienza vacía: los usuarios se crean con `POST /users`.
 
 ### Schemas de usuario
 

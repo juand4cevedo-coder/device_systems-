@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -7,6 +8,11 @@ class UserRole(StrEnum):
     ADMIN = "admin"
     SUPPORT = "support"
     USER = "user"
+
+
+class UserOrderBy(StrEnum):
+    NAME = "name"
+    CREATED_AT = "created_at"
 
 
 class UserBase(BaseModel):
@@ -24,18 +30,13 @@ class UserCreate(UserBase):
     """Datos de entrada para registrar un usuario."""
 
 
-class User(UserBase):
-    """Usuario completo, con su identificador."""
-
-    id: int
-
-
 class UserResponse(UserBase):
     """Modelo público de respuesta: lo que la API expone al cliente."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    created_at: datetime
 
 
 class UserUpdate(UserBase):

@@ -1,6 +1,6 @@
 # device_systems
 
-API REST para la gestión de usuarios del sistema device_systems, construida con FastAPI.
+API REST para la gestión de usuarios del sistema device_systems, construida con FastAPI. Implementa el CRUD completo del recurso `users`, con validación de datos (Pydantic v2), manejo de errores con códigos HTTP, dependencias reutilizables (`Depends()`) y documentación automática con Swagger/OpenAPI.
 
 ## Requisitos
 
@@ -353,3 +353,74 @@ Los datos persisten entre reinicios del servidor. La base de datos comienza vac�
 | `UserUpdate` | Body de `PUT /users/{user_id}` | Las mismas, con todos los campos obligatorios |
 | `UserPatch` | Body de `PATCH /users/{user_id}` | Las mismas, con todos los campos opcionales |
 | `UserResponse` | Respuesta de los endpoints | Se construye desde el modelo SQLAlchemy |
+## Tecnologías utilizadas
+
+- Python 3
+- [FastAPI](https://fastapi.tiangolo.com/): framework para construir la API REST
+- [Uvicorn](https://www.uvicorn.org/): servidor ASGI
+- [Pydantic v2](https://docs.pydantic.dev/): validación de datos y modelos
+- email-validator: validación del formato de correo
+- [uv](https://docs.astral.sh/uv/): gestión de dependencias y entorno virtual
+- Git, GitHub y GitFlow: control de versiones
+
+## Evidencias de pruebas (EV08)
+
+Pruebas funcionales de los seis endpoints y de los escenarios de error, ejecutadas desde Swagger UI, ReDoc y Thunder Client.
+
+### Swagger UI y ReDoc
+
+![Swagger UI: vista general](docs/images/ev08/01-swagger-overview.png)
+*Título, versión 2.0.0, tag `Users` y los seis endpoints con su `summary`.*
+
+![Swagger UI: schemas](docs/images/ev08/02-swagger-schemas.png)
+*Schemas de entrada (`UserCreate`, `UserUpdate`, `UserPatch`) y de salida (`UserResponse`).*
+
+![ReDoc: vista general](docs/images/ev08/03-redoc-overview.png)
+*Documentación de la API en `/redoc`.*
+
+![ReDoc: detalle de un endpoint](docs/images/ev08/04-redoc-endpoint-detail.png)
+*Descripción y respuestas de `POST /users`.*
+
+### Pruebas de cada endpoint
+
+![GET /users](docs/images/ev08/05-get-users.png)
+*`GET /users`: 200 con las cabeceras personalizadas.*
+
+![GET /users/1](docs/images/ev08/06-get-user-by-id.png)
+*`GET /users/{user_id}`: 200.*
+
+![POST /users](docs/images/ev08/07-post-user-created.png)
+*`POST /users`: 201 Created.*
+
+![PUT /users/2](docs/images/ev08/08-put-user-updated.png)
+*`PUT /users/{user_id}`: 200, reemplazo completo.*
+
+![PATCH /users/3](docs/images/ev08/09-patch-user-updated.png)
+*`PATCH /users/{user_id}`: 200, actualización parcial de un solo campo.*
+
+![DELETE /users/4](docs/images/ev08/10-delete-user-204.png)
+*`DELETE /users/{user_id}`: 204 No Content, sin cuerpo.*
+
+### Errores controlados
+
+![Error 404](docs/images/ev08/11-error-404-user-not-found.png)
+*Buscar un usuario inexistente: 404 Not Found.*
+
+![Error 400 por correo duplicado](docs/images/ev08/12-error-400-duplicate-email.png)
+*Crear un usuario con un correo repetido: 400 Bad Request.*
+
+![Error 422](docs/images/ev08/13-error-422-validation.png)
+*Crear un usuario con datos inválidos: 422 Unprocessable Entity.*
+
+![Error 404 al actualizar](docs/images/ev08/14-error-404-update-nonexistent.png)
+*Actualizar un usuario inexistente: 404 Not Found.*
+
+![Error 400 por PATCH vacío](docs/images/ev08/15-error-400-empty-patch.png)
+*PATCH sin ningún campo: 400 Bad Request.*
+
+![Error 404 al eliminar](docs/images/ev08/16-error-404-delete-nonexistent.png)
+*Eliminar un usuario inexistente: 404 Not Found.*
+
+## Reflexión final sobre la evolución del proyecto (EV08)
+
+En EV07 la API solo permitía consultar y crear usuarios, con todo el código en las rutas. En EV08 pasó a ser un CRUD completo con una estructura por capas: rutas para los endpoints, schemas para validar, servicios para la lógica, dependencias para reutilizar validaciones y una capa de datos en memoria. Separar responsabilidades hizo que cada archivo tenga un único propósito. Con `Depends()` las validaciones se escriben una sola vez y se reutilizan, los códigos de estado y las `HTTPException` hacen que la API responda de forma predecible ante los errores, y Swagger/OpenAPI permite probarla y documentarla sin herramientas externas. [Completa con lo que más te costó o lo que más valoras de esta evolución.]

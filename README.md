@@ -88,6 +88,48 @@ Respuesta `201 Created`:
 | 400 Bad Request | El correo ya está registrado |
 | 422 Unprocessable Entity | Datos inválidos (nombre corto, email mal formado, rol no permitido) |
 
+| PUT | `/users/{user_id}` | Reemplaza por completo un usuario | Path: `user_id`. Body: `name`, `email`, `role`, `is_active` (todos obligatorios) |
+| PATCH | `/users/{user_id}` | Actualiza parcialmente un usuario | Path: `user_id`. Body: uno o más de `name`, `email`, `role`, `is_active` |
+
+### Ejemplos de peticiones PUT y PATCH
+
+```bash
+# PUT: reemplazo completo
+curl -X PUT http://127.0.0.1:8000/users/2 \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Carlos Gómez Ruiz", "email": "carlos@sena.edu.co", "role": "support", "is_active": true}'
+
+# PATCH: actualización parcial
+curl -X PATCH http://127.0.0.1:8000/users/3 \
+  -H "Content-Type: application/json" \
+  -d '{"role": "support"}'
+```
+
+Ambos responden `200 OK` con el usuario actualizado.
+
+### Respuestas de error de PUT y PATCH
+
+| Código | Caso |
+|---|---|
+| 404 Not Found | El usuario no existe |
+| 400 Bad Request | El correo pertenece a otro usuario, o el PATCH no trae ningún campo |
+| 422 Unprocessable Entity | Datos inválidos, o falta un campo obligatorio en el PUT |
+
+| DELETE | `/users/{user_id}` | Elimina un usuario | Path: `user_id` |
+
+### Ejemplo de petición DELETE
+
+```bash
+curl -X DELETE http://127.0.0.1:8000/users/3
+```
+
+Responde `204 No Content`, sin cuerpo de respuesta.
+
+| Código | Caso |
+|---|---|
+| 204 No Content | Usuario eliminado correctamente |
+| 404 Not Found | El usuario no existe |
+
 ## Response models y cabeceras HTTP
 
 Todos los endpoints declaran un `response_model` (`UserResponse`), que define los campos que la API expone: `id`, `name`, `email`, `role` e `is_active`.
@@ -97,7 +139,7 @@ Las respuestas exitosas incluyen estas cabeceras personalizadas:
 | Cabecera | Valor |
 |---|---|
 | `X-App-Name` | `device_systems` |
-| `X-API-Version` | `1.0` |
+| `X-API-Version` | `2.0` |
 
 ## Estructura del proyecto
 
@@ -105,16 +147,30 @@ Las respuestas exitosas incluyen estas cabeceras personalizadas:
 device_systems/
 ├── app/
 │   ├── main.py
+│   ├── routes/
+│   │   └── user_routes.py
 │   ├── schemas/
 │   │   └── user_schema.py
-│   └── routes/
-│       └── user_routes.py
+│   ├── services/
+│   │   └── user_service.py
+│   ├── dependencies/
+│   │   └── user_dependencies.py
+│   └── data/
+│       └── users_db.py
 ├── docs/
 │   └── images/
-│       └── ev07/
 ├── pyproject.toml
+├── requirements.txt
 └── README.md
 ```
+
+| Carpeta | Responsabilidad |
+|---|---|
+| `routes` | Definición de endpoints |
+| `schemas` | Modelos Pydantic de entrada y salida |
+| `services` | Lógica de negocio |
+| `dependencies` | Funciones reutilizables con `Depends()` |
+| `data` | Simulación de base de datos en memoria |
 
 ## Flujo de trabajo Git
 
@@ -171,3 +227,67 @@ Los commits siguen Conventional Commits: `tipo(scope): descripción` (por ejempl
 ## Reflexión sobre FastAPI (EV07)
 
 FastAPI permitió construir la API de `users` con poco código: los path y query parameters se declaran como argumentos de las funciones, Pydantic valida los datos de entrada y los `response_model` controlan lo que la API devuelve, todo apoyado en los tipos de Python. Además, la documentación interactiva se genera automáticamente y sirvió para probar cada endpoint sin herramientas externas. [Completa con lo que más te sirvió o te costó aprender.]
+
+## Códigos de estado usados
+
+| Operación | Método y ruta | Código |
+|---|---|---|
+| Listar usuarios | `GET /users` | 200 OK |
+| Consultar usuario | `GET /users/{user_id}` | 200 OK |
+| Crear usuario | `POST /users` | 201 Created |
+| Actualizar completo | `PUT /users/{user_id}` | 200 OK |
+| Actualizar parcial | `PATCH /users/{user_id}` | 200 OK |
+| Eliminar usuario | `DELETE /users/{user_id}` | 204 No Content |
+| Usuario no encontrado | Cualquier método por ID | 404 Not Found |
+| Correo duplicado | `POST`, `PUT` y `PATCH` | 400 Bad Request |
+| Actualización sin datos | `PATCH /users/{user_id}` | 400 Bad Request |
+| Datos inválidos | Validación Pydantic | 422 Unprocessable Entity |
+
+## Manejo de errores
+
+| Caso | Código | Respuesta |
+|---|---|---|
+| Usuario no encontrado (incluye eliminar o actualizar uno inexistente) | 404 | `{"detail": "Usuario no encontrado"}` |
+| Correo duplicado | 400 | `{"detail": "El correo ya está registrado"}` |
+| PATCH sin ningún campo | 400 | `{"detail": "Debe enviar al menos un campo para actualizar"}` |
+| Rol no permitido o datos inválidos | 422 | Lista de errores de validación de Pydantic en `detail` |
+
+## Dependency Injection con Depends()
+
+FastAPI resuelve las dependencias declaradas con `Depends()` antes de ejecutar cada endpoint. Las funciones reutilizables viven en `app/dependencies/user_dependencies.py`:
+
+| Dependencia | Qué hace | Dónde se usa |
+|---|---|---|
+| `set_api_headers` | Agrega `X-App-Name` y `X-API-Version` a cada respuesta | Todo el router `/users` |
+| `get_user_or_404` | Busca el usuario por ID o lanza 404 | GET, PUT, PATCH y DELETE por ID |
+| `validate_new_user` | Valida el body del POST y que el correo no esté registrado (400) | POST |
+| `validate_user_replacement` | Valida el body del PUT y que el correo no sea de otro usuario (400) | PUT |
+| `validate_user_changes` | Valida el body del PATCH, rechaza el PATCH vacío (400) y el correo de otro usuario (400) | PATCH |
+
+Ventajas de este enfoque:
+
+- La lógica de validación se escribe una sola vez y se reutiliza en varios endpoints.
+- Las rutas quedan cortas y solo llaman al servicio.
+- FastAPI ejecuta cada dependencia una sola vez por petición, aunque varias la declaren.
+- Los errores (`HTTPException`) se lanzan desde las dependencias, por lo que todos los endpoints responden igual ante el mismo caso.
+
+## Documentación automática (Swagger/OpenAPI)
+
+FastAPI genera la documentación de la API a partir del código:
+
+| Interfaz | URL |
+|---|---|
+| Swagger UI | http://127.0.0.1:8000/docs |
+| ReDoc | http://127.0.0.1:8000/redoc |
+
+La aplicación configura estos metadatos en `app/main.py`:
+
+- **Título:** `device_systems API`
+- **Descripción:** API REST para la gestión de usuarios del sistema device_systems
+- **Versión:** `2.0.0`
+- **Contacto:** autor del proyecto
+- **Tags:** `Users` (con descripción)
+
+Cada endpoint declara `summary`, `description` y `response_description`, por lo que la documentación explica qué hace, qué validaciones aplica y qué devuelve.
+
+Swagger/OpenAPI permite probar cada endpoint desde el navegador sin herramientas externas, y mantiene la documentación siempre sincronizada con el código.

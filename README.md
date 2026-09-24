@@ -98,3 +98,76 @@ Las respuestas exitosas incluyen estas cabeceras personalizadas:
 |---|---|
 | `X-App-Name` | `device_systems` |
 | `X-API-Version` | `1.0` |
+
+## Estructura del proyecto
+
+```text
+device_systems/
+├── app/
+│   ├── main.py
+│   ├── schemas/
+│   │   └── user_schema.py
+│   └── routes/
+│       └── user_routes.py
+├── docs/
+│   └── images/
+│       └── ev07/
+├── pyproject.toml
+└── README.md
+```
+
+## Flujo de trabajo Git
+
+El proyecto sigue GitFlow:
+
+| Rama | Uso |
+|---|---|
+| `main` | Versiones estables, cada una con su tag (`v1.0.0`) |
+| `develop` | Integración del trabajo en curso |
+| `feature/*` | Una rama por fase de la actividad, integrada a `develop` mediante Pull Request |
+| `release/*` | Preparación de cada versión antes de pasar a `main` |
+
+Los commits siguen Conventional Commits: `tipo(scope): descripción` (por ejemplo, `feat(users): add POST /users`).
+
+## Evidencias de pruebas (EV07)
+
+### Swagger UI
+
+![Vista general de Swagger UI](docs/images/ev07/01-swagger-overview.png)
+*Endpoints del recurso `users` en `/docs`.*
+
+![Schemas en Swagger UI](docs/images/ev07/02-swagger-schemas.png)
+*Schemas de entrada y salida.*
+
+### GET /users
+
+![GET /users](docs/images/ev07/03-get-users.png)
+*Listado completo con las cabeceras personalizadas en la respuesta.*
+
+![GET /users con filtro por rol](docs/images/ev07/04-get-users-filter-role.png)
+*Filtro con query parameter `role=admin`.*
+
+### GET /users/{user_id}
+
+![GET /users/1](docs/images/ev07/05-get-user-by-id.png)
+*Consulta por ID con path parameter.*
+
+### POST /users
+
+![POST /users](docs/images/ev07/06-post-user-created.png)
+*Registro de un usuario nuevo: respuesta `201 Created`.*
+
+### Validaciones y errores
+
+![Error 404](docs/images/ev07/07-error-404-user-not-found.png)
+*Usuario inexistente: `404 Not Found`.*
+
+![Error 400](docs/images/ev07/08-error-400-duplicate-email.png)
+*Correo duplicado: `400 Bad Request`.*
+
+![Error 422](docs/images/ev07/09-error-422-validation.png)
+*Datos inválidos: `422 Unprocessable Entity`.*
+
+## Reflexión sobre FastAPI (EV07)
+
+FastAPI permitió construir la API de `users` con poco código: los path y query parameters se declaran como argumentos de las funciones, Pydantic valida los datos de entrada y los `response_model` controlan lo que la API devuelve, todo apoyado en los tipos de Python. Además, la documentación interactiva se genera automáticamente y sirvió para probar cada endpoint sin herramientas externas. [Completa con lo que más te sirvió o te costó aprender.]

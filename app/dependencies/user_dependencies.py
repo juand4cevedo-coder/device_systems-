@@ -12,7 +12,7 @@ from app.services import user_service
 def set_api_headers(response: Response) -> None:
     """Agrega las cabeceras personalizadas de la API a cada respuesta."""
     response.headers["X-App-Name"] = "device_systems"
-    response.headers["X-API-Version"] = "2.1"
+    response.headers["X-API-Version"] = "2.2"
 
 
 def get_user_or_404(user_id: int, db: Session = Depends(get_db)) -> User:

@@ -35,7 +35,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title="device_systems API",
     description="API REST para la gestión de usuarios del sistema device_systems",
-    version="2.1.0",
+    version="2.2.0",
     contact={
         "name": "Tu nombre completo",
         "url": "https://github.com/juand4cevedo-coder",

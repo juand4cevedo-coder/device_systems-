@@ -12,7 +12,7 @@ from app.services import user_service
 def set_api_headers(response: Response) -> None:
     """Agrega las cabeceras personalizadas de la API a cada respuesta."""
     response.headers["X-App-Name"] = "device_systems"
-    response.headers["X-API-Version"] = "2.1"
+    response.headers["X-API-Version"] = "2.2"
 
 
 def get_user_or_404(user_id: int, db: Session = Depends(get_db)) -> User:
@@ -68,3 +68,13 @@ def validate_user_changes(
     if "email" in changes:
         _ensure_email_available(db, changes["email"], user.id)
     return changes
+
+
+def ensure_user_can_be_deleted(user: User = Depends(get_user_or_404)) -> User:
+    """Lanza 409 si el usuario tiene préstamos registrados."""
+    if user.loans:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede eliminar un usuario con préstamos registrados",
+        )
+    return user

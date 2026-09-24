@@ -58,3 +58,32 @@ Respuesta de `GET /users/1`:
   "is_active": true
 }
 ```
+
+| POST | `/users` | Registra un nuevo usuario | Body JSON: `name`, `email`, `role`, `is_active` (opcional) |
+
+### Ejemplo de petición POST
+
+```bash
+curl -X POST http://127.0.0.1:8000/users \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Marta Ruiz", "email": "marta@sena.edu.co", "role": "user"}'
+```
+
+Respuesta `201 Created`:
+
+```json
+{
+  "id": 4,
+  "name": "Marta Ruiz",
+  "email": "marta@sena.edu.co",
+  "role": "user",
+  "is_active": true
+}
+```
+
+### Respuestas de error del POST
+
+| Código | Caso |
+|---|---|
+| 400 Bad Request | El correo ya está registrado |
+| 422 Unprocessable Entity | Datos inválidos (nombre corto, email mal formado, rol no permitido) |

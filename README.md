@@ -11,6 +11,8 @@ API REST para la gestión de usuarios del sistema device_systems, construida con
 - email-validator: validación del formato de correo
 - [uv](https://docs.astral.sh/uv/): gestión de dependencias y entorno virtual
 - Git, GitHub y GitFlow: control de versiones
+- [SQLAlchemy](https://www.sqlalchemy.org/): ORM para la persistencia de datos
+- SQLite: base de datos relacional de desarrollo
 
 ## Requisitos
 
@@ -37,30 +39,38 @@ Documentación interactiva: http://127.0.0.1:8000/docs
 device_systems/
 ├── app/
 │   ├── main.py
-│   ├── routes/
-│   │   └── user_routes.py
+│   ├── database/
+│   │   └── connection.py
+│   ├── models/
+│   │   └── user_model.py
 │   ├── schemas/
 │   │   └── user_schema.py
+│   ├── routes/
+│   │   └── user_routes.py
 │   ├── services/
 │   │   └── user_service.py
-│   ├── dependencies/
-│   │   └── user_dependencies.py
-│   └── data/
-│       └── users_db.py
+│   └── dependencies/
+│       ├── database_dependency.py
+│       └── user_dependencies.py
 ├── docs/
 │   └── images/
+├── CHANGELOG.md
 ├── pyproject.toml
 ├── requirements.txt
 └── README.md
 ```
 
+`device_systems.db` se genera al iniciar la aplicación y no se versiona.
+
 | Carpeta | Responsabilidad |
 |---|---|
-| `routes` | Definición de endpoints |
+| `database` | Conexión a la base de datos: engine, sesión y base declarativa |
+| `models` | Modelos SQLAlchemy: tablas de la base de datos |
 | `schemas` | Modelos Pydantic de entrada y salida |
-| `services` | Lógica de negocio |
-| `dependencies` | Funciones reutilizables con `Depends()` |
-| `data` | Simulación de base de datos en memoria |
+| `routes` | Definición de endpoints |
+| `services` | Lógica de negocio y consultas a la base de datos |
+| `dependencies` | Funciones reutilizables con `Depends()`, incluida la sesión de base de datos |
+
 
 ## Base de datos (SQLAlchemy)
 
@@ -214,7 +224,7 @@ Las respuestas exitosas incluyen estas cabeceras personalizadas:
 | Cabecera | Valor |
 |---|---|
 | `X-App-Name` | `device_systems` |
-| `X-API-Version` | `2.0` |
+| `X-API-Version` | `2.1` |
 
 ## Operaciones CRUD sobre la base de datos
 
@@ -379,6 +389,79 @@ Pruebas funcionales de los seis endpoints y de los escenarios de error, ejecutad
 ![Error 404 al eliminar](docs/images/ev08/16-error-404-delete-nonexistent.png)
 *Eliminar un usuario inexistente: 404 Not Found.*
 
+## Evidencias de pruebas (EV09)
+
+### Estructura del proyecto y base de datos
+
+![Estructura del proyecto](docs/images/ev09/01-project-structure.png)
+*Estructura del proyecto con las capas `database`, `models`, `schemas`, `routes`, `services` y `dependencies`.*
+
+![Esquema de la base de datos](docs/images/ev09/02-database-schema.png)
+*Tabla `users` generada por SQLAlchemy, con sus restricciones y el índice único de `email`.*
+
+### Swagger UI y ReDoc
+
+![Swagger UI: vista general](docs/images/ev09/03-swagger-overview.png)
+*Endpoints de `users` en `/docs`, versión 2.1.0.*
+
+![Swagger UI: schemas](docs/images/ev09/04-swagger-schemas.png)
+*Schemas de entrada y de respuesta.*
+
+![Swagger UI: parámetros de consulta](docs/images/ev09/05-swagger-get-users-params.png)
+*`GET /users` con los parámetros `role`, `is_active` y `order_by`.*
+
+![ReDoc](docs/images/ev09/06-redoc-overview.png)
+*Documentación en `/redoc`.*
+
+### Pruebas funcionales mínimas
+
+![Test 1](docs/images/ev09/07-test01-post-user-created.png)
+*1. Crear un usuario válido: 201 Created.*
+
+![Test 2](docs/images/ev09/08-test02-post-duplicate-email-400.png)
+*2. Crear un usuario con email repetido: 400 Bad Request.*
+
+![Test 3](docs/images/ev09/09-test03-get-users.png)
+*3. Listar usuarios: 200 OK.*
+
+![Test 4](docs/images/ev09/10-test04-get-user-by-id.png)
+*4. Consultar un usuario por ID: 200 OK.*
+
+![Test 5](docs/images/ev09/11-test05-get-user-not-found-404.png)
+*5. Consultar un usuario inexistente: 404 Not Found.*
+
+![Test 6](docs/images/ev09/12-test06-filter-by-role.png)
+*6. Filtrar usuarios por rol: solo el administrador.*
+
+![Test 7](docs/images/ev09/13-test07-filter-active-users.png)
+*7. Filtrar usuarios activos: se excluye al usuario inactivo.*
+
+![Test 8](docs/images/ev09/14-test08-put-user.png)
+*8. Actualizar un usuario completo con PUT: 200 OK.*
+
+![Test 9](docs/images/ev09/15-test09-patch-user.png)
+*9. Actualizar parcialmente un usuario con PATCH: 200 OK.*
+
+![Test 10](docs/images/ev09/16-test10-delete-user-204.png)
+*10. Eliminar un usuario con DELETE: 204 No Content.*
+
+![Test 11](docs/images/ev09/17-test11-deleted-user-not-found.png)
+*11. Validar que el usuario eliminado ya no exista: 404 Not Found.*
+
+### Errores controlados
+
+![Error 422 por datos inválidos](docs/images/ev09/18-error-422-invalid-data.png)
+*Datos inválidos (nombre corto y correo mal formado): 422 Unprocessable Entity.*
+
+![Error 422 por rol no permitido](docs/images/ev09/19-error-422-role-not-allowed.png)
+*Rol no permitido: 422 Unprocessable Entity.*
+
+![Error 404 al actualizar](docs/images/ev09/20-error-404-update-nonexistent.png)
+*Actualizar un usuario inexistente: 404 Not Found.*
+
+![Error 404 al eliminar](docs/images/ev09/21-error-404-delete-nonexistent.png)
+*Eliminar un usuario inexistente: 404 Not Found.*
+
 ## Evidencias de pruebas (EV07)
 
 ### Swagger UI
@@ -418,6 +501,12 @@ Pruebas funcionales de los seis endpoints y de los escenarios de error, ejecutad
 ![Error 422](docs/images/ev07/09-error-422-validation.png)
 *Datos inválidos: `422 Unprocessable Entity`.*
 
+
+## Reflexión final sobre la persistencia (EV09)
+
+Hasta EV08 los usuarios vivían en una lista en memoria y desaparecían cada vez que el servidor se reiniciaba. Con SQLAlchemy y SQLite los datos se guardan en un archivo y siguen disponibles después de reiniciar el servidor. Separar el modelo SQLAlchemy (cómo se guarda un usuario) del schema Pydantic (cómo entra y sale por la API) permite que cada uno cambie sin afectar al otro, y los constraints de la base de datos (`nullable=False`, `unique=True`) protegen la integridad de los datos además de las validaciones de la API. La sesión de base de datos se entrega con `Depends(get_db)`, lo que reutiliza el mismo mecanismo de dependencias de EV08. [Completa con lo que más te costó o lo que más valoras de la persistencia.]
+
+
 ## Reflexión final sobre la evolución del proyecto (EV08)
 
 En EV07 la API solo permitía consultar y crear usuarios, con todo el código en las rutas. En EV08 pasó a ser un CRUD completo con una estructura por capas: rutas para los endpoints, schemas para validar, servicios para la lógica, dependencias para reutilizar validaciones y una capa de datos en memoria. Separar responsabilidades hizo que cada archivo tenga un único propósito. Con `Depends()` las validaciones se escriben una sola vez y se reutilizan, los códigos de estado y las `HTTPException` hacen que la API responda de forma predecible ante los errores, y Swagger/OpenAPI permite probarla y documentarla sin herramientas externas. [Completa con lo que más te costó o lo que más valoras de esta evolución.]
@@ -425,4 +514,3 @@ En EV07 la API solo permitía consultar y crear usuarios, con todo el código en
 ## Reflexión sobre FastAPI (EV07)
 
 FastAPI permitió construir la API de `users` con poco código: los path y query parameters se declaran como argumentos de las funciones, Pydantic valida los datos de entrada y los `response_model` controlan lo que la API devuelve, todo apoyado en los tipos de Python. Además, la documentación interactiva se genera automáticamente y sirvió para probar cada endpoint sin herramientas externas. [Completa con lo que más te sirvió o te costó aprender.]
-

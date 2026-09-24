@@ -1,4 +1,7 @@
-from fastapi import Depends, HTTPException, status
+from datetime import date
+from typing import Annotated
+
+from fastapi import Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.dependencies.database_dependency import get_db
@@ -50,3 +53,44 @@ def ensure_loan_can_be_returned(loan: Loan = Depends(get_loan_or_404)) -> Loan:
             status_code=status.HTTP_409_CONFLICT, detail="El préstamo ya fue devuelto"
         )
     return loan
+
+
+def get_loan_filters(
+    loan_status: Annotated[
+        LoanStatus | None, Query(alias="status", description="Estado del préstamo")
+    ] = None,
+    user_id: Annotated[int | None, Query(description="ID del usuario")] = None,
+    device_id: Annotated[int | None, Query(description="ID del dispositivo")] = None,
+    user_email: Annotated[
+        str | None,
+        Query(
+            description="Correo del usuario (búsqueda parcial, sin distinguir mayúsculas)"
+        ),
+    ] = None,
+    device_type: Annotated[
+        str | None,
+        Query(description="Tipo de dispositivo (sin distinguir mayúsculas)"),
+    ] = None,
+    date_from: Annotated[
+        date | None,
+        Query(description="Fecha de préstamo desde, inclusive (AAAA-MM-DD)"),
+    ] = None,
+    date_to: Annotated[
+        date | None,
+        Query(description="Fecha de préstamo hasta, inclusive (AAAA-MM-DD)"),
+    ] = None,
+) -> loan_service.LoanFilters:
+    """Reúne y valida los filtros opcionales de la consulta de préstamos."""
+    if date_from is not None and date_to is not None and date_from > date_to:
+        raise HTTPException(
+            status_code=422, detail="date_from no puede ser posterior a date_to"
+        )
+    return loan_service.LoanFilters(
+        status=loan_status,
+        user_id=user_id,
+        device_id=device_id,
+        user_email=user_email,
+        device_type=device_type,
+        date_from=date_from,
+        date_to=date_to,
+    )

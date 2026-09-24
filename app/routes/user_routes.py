@@ -1,5 +1,6 @@
 from typing import Any
 
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,7 @@ from app.dependencies.user_dependencies import (
     validate_new_user,
     validate_user_changes,
     validate_user_replacement,
+    ensure_user_can_be_deleted,
 )
 from app.models.user_model import User
 from app.schemas.user_schema import (
@@ -112,11 +114,11 @@ def patch_user(
     "/{user_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Eliminar un usuario",
-    description="Elimina el usuario indicado. Responde 404 si no existe.",
+    description="Elimina el usuario indicado. Responde 404 si no existe y 409 si tiene préstamos registrados.",
     response_description="Usuario eliminado; la respuesta no tiene cuerpo",
 )
 def delete_user(
-    user: User = Depends(get_user_or_404), db: Session = Depends(get_db)
+    user: User = Depends(ensure_user_can_be_deleted), db: Session = Depends(get_db)
 ) -> None:
     user_service.delete_user(db, user)
 

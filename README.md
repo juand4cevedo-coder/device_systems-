@@ -73,7 +73,6 @@ device_systems/
 | `services` | Lógica de negocio y consultas a la base de datos |
 | `dependencies` | Funciones reutilizables con `Depends()`, incluida la sesión de base de datos |
 
-
 ## Base de datos (SQLAlchemy)
 
 El archivo device_systems.db se crea automáticamente al iniciar la aplicación y no se versiona. por El archivo device_systems.db se crea al aplicar las migraciones de Alembic y no se versiona.
@@ -143,6 +142,51 @@ Cada migración incluye `downgrade()`, por lo que se puede revertir con `uv run 
 | Clases | `User` | `UserCreate`, `UserUpdate`, `UserPatch`, `UserResponse` |
 
 Se mantienen separados para que la base de datos y el contrato de la API puedan evolucionar de forma independiente. Por ejemplo, el modelo puede tener columnas que la API no expone. `UserResponse` usa `from_attributes=True` para convertir un objeto del modelo en la respuesta de la API.
+
+## Schemas de dispositivos y préstamos
+
+### Dispositivos
+
+| Schema | Uso | Campos |
+|---|---|---|
+| `DeviceCreate` | Body de `POST /devices` y `PUT /devices/{device_id}` | `name`, `serial_number`, `device_type` (obligatorios) y `brand` (opcional) |
+| `DeviceUpdate` | Body de `PATCH /devices/{device_id}` | Los mismos campos, todos opcionales |
+| `DeviceResponse` | Respuesta de los endpoints de dispositivos | Todos los campos, incluidos `id`, `is_available` y `created_at` |
+
+`is_available` no se envía en las peticiones: el sistema lo actualiza al registrar y devolver préstamos.
+
+### Préstamos
+
+| Schema | Uso | Campos |
+|---|---|---|
+| `LoanCreate` | Body de `POST /loans` | `user_id` y `device_id` |
+| `LoanUpdate` | Actualización de un préstamo (la devolución se registra con `PATCH /loans/{loan_id}/return`) | `status` y `return_date`, opcionales |
+| `LoanResponse` | Respuesta de un préstamo | `id`, `user_id`, `device_id`, `loan_date`, `return_date` y `status` |
+| `LoanDetailResponse` | Préstamo con la información relacionada | Datos del préstamo más `user` y `device` anidados |
+
+Estados de préstamo (`LoanStatus`): `active`, `returned` y `overdue`.
+
+Ejemplo de `LoanDetailResponse`:
+
+```json
+{
+  "loan_id": 1,
+  "status": "active",
+  "loan_date": "2026-09-24T15:04:05.123456",
+  "return_date": null,
+  "user": {
+    "id": 1,
+    "name": "Ana Pérez",
+    "email": "ana@sena.edu.co"
+  },
+  "device": {
+    "id": 3,
+    "name": "Laptop Lenovo ThinkPad",
+    "serial_number": "LEN-2024-001",
+    "device_type": "laptop"
+  }
+}
+```
 
 ## Endpoints
 
@@ -253,6 +297,125 @@ Las respuestas exitosas incluyen estas cabeceras personalizadas:
 |---|---|
 | `X-App-Name` | `device_systems` |
 | `X-API-Version` | `2.1` |
+
+## Endpoints de dispositivos
+
+| Método | Ruta | Descripción | Parámetros |
+|---|---|---|---|
+| GET | `/devices` | Lista dispositivos | Query opcionales: `device_type`, `is_available`, `brand`, `search` |
+| GET | `/devices/{device_id}` | Consulta un dispositivo por ID | Path: `device_id` (int) |
+| POST | `/devices` | Registra un dispositivo | Body JSON: `name`, `serial_number`, `device_type`, `brand` (opcional) |
+| PUT | `/devices/{device_id}` | Reemplaza por completo un dispositivo | Path: `device_id`. Body: los mismos campos |
+| PATCH | `/devices/{device_id}` | Actualiza parcialmente un dispositivo | Path: `device_id`. Body: uno o más campos |
+| DELETE | `/devices/{device_id}` | Elimina un dispositivo | Path: `device_id` |
+
+### Filtros de `GET /devices`
+
+| Parámetro | Ejemplo | Comportamiento |
+|---|---|---|
+| `device_type` | `?device_type=laptop` | Tipo exacto, sin distinguir mayúsculas |
+| `is_available` | `?is_available=true` | Dispositivos disponibles o prestados |
+| `brand` | `?brand=lenovo` | Marca exacta, sin distinguir mayúsculas |
+| `search` | `?search=thinkpad` | Texto contenido en el nombre, el número de serie, el tipo o la marca (`ilike` combinado con `or_`) |
+
+Los filtros se pueden combinar: `GET /devices?device_type=laptop&is_available=true`.
+
+### Ejemplos de peticiones
+
+```bash
+curl -X POST http://127.0.0.1:8000/devices \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Laptop Lenovo ThinkPad", "serial_number": "LEN-2024-001", "device_type": "laptop", "brand": "Lenovo"}'
+
+curl "http://127.0.0.1:8000/devices?brand=lenovo"
+curl "http://127.0.0.1:8000/devices?search=thinkpad"
+```
+
+Respuesta `201 Created` del POST:
+
+```json
+{
+  "id": 1,
+  "name": "Laptop Lenovo ThinkPad",
+  "serial_number": "LEN-2024-001",
+  "device_type": "laptop",
+  "brand": "Lenovo",
+  "is_available": true,
+  "created_at": "2026-09-24T15:04:05.123456"
+}
+```
+
+### Respuestas de error
+
+| Código | Caso |
+|---|---|
+| 404 Not Found | El dispositivo no existe |
+| 400 Bad Request | El número de serie ya está registrado, o el PATCH no trae ningún campo |
+| 409 Conflict | El dispositivo tiene préstamos registrados y no se puede eliminar |
+| 422 Unprocessable Entity | Datos inválidos o campos obligatorios ausentes |
+
+El número de serie se compara sin distinguir mayúsculas. `is_available` no se envía en las peticiones: cambia con los préstamos. Para quitar la marca de un dispositivo se usa el PUT, porque el PATCH ignora los campos vacíos.
+
+## Endpoints de préstamos
+
+| Método | Ruta | Descripción | Parámetros |
+|---|---|---|---|
+| GET | `/loans` | Lista los préstamos con su usuario y su dispositivo | — |
+| GET | `/loans/{loan_id}` | Consulta un préstamo por ID | Path: `loan_id` (int) |
+| POST | `/loans` | Presta un dispositivo a un usuario | Body JSON: `user_id`, `device_id` |
+| PATCH | `/loans/{loan_id}/return` | Registra la devolución de un dispositivo | Path: `loan_id` (int) |
+
+### Reglas de negocio
+
+**`POST /loans`**
+
+1. Valida que el usuario exista.
+2. Valida que el dispositivo exista.
+3. Valida que el dispositivo esté disponible.
+4. Crea el préstamo con estado `active`.
+5. Cambia `is_available` del dispositivo a `False`.
+
+**`PATCH /loans/{loan_id}/return`**
+
+1. Valida que el préstamo exista y que no haya sido devuelto.
+2. Marca el préstamo como `returned`.
+3. Asigna la fecha de devolución (`return_date`).
+4. Cambia `is_available` del dispositivo a `True`.
+
+Cada operación se guarda en una sola transacción: el préstamo y el estado del dispositivo cambian juntos.
+
+### Ejemplos de peticiones
+
+```bash
+curl -X POST http://127.0.0.1:8000/loans \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": 1, "device_id": 1}'
+
+curl -X PATCH http://127.0.0.1:8000/loans/1/return
+```
+
+Respuesta `201 Created` del POST:
+
+```json
+{
+  "id": 1,
+  "user_id": 1,
+  "device_id": 1,
+  "loan_date": "2026-09-24T15:04:05.123456",
+  "return_date": null,
+  "status": "active"
+}
+```
+
+### Respuestas de error
+
+| Código | Caso |
+|---|---|
+| 404 Not Found | El usuario, el dispositivo o el préstamo no existen |
+| 409 Conflict | El dispositivo no está disponible, o el préstamo ya fue devuelto |
+| 422 Unprocessable Entity | Datos inválidos (por ejemplo, `user_id` menor que 1 o campo ausente) |
+
+Un dispositivo con préstamos registrados, aunque ya estén devueltos, no se puede eliminar: `DELETE /devices/{device_id}` responde `409 Conflict`.
 
 ## Operaciones CRUD sobre la base de datos
 
@@ -376,64 +539,6 @@ El proyecto sigue GitFlow:
 
 Los commits siguen Conventional Commits: `tipo(scope): descripción` (por ejemplo, `feat(users): add POST /users`).
 
-## Evidencias de pruebas (EV08)
-
-Pruebas funcionales de los seis endpoints y de los escenarios de error, ejecutadas desde Swagger UI, ReDoc y Thunder Client.
-
-### Swagger UI y ReDoc
-
-![Swagger UI: vista general](docs/images/ev08/01-swagger-overview.png)
-*Título, versión 2.0.0, tag `Users` y los seis endpoints con su `summary`.*
-
-![Swagger UI: schemas](docs/images/ev08/02-swagger-schemas.png)
-*Schemas de entrada (`UserCreate`, `UserUpdate`, `UserPatch`) y de salida (`UserResponse`).*
-
-![ReDoc: vista general](docs/images/ev08/03-redoc-overview.png)
-*Documentación de la API en `/redoc`.*
-
-![ReDoc: detalle de un endpoint](docs/images/ev08/04-redoc-endpoint-detail.png)
-*Descripción y respuestas de `POST /users`.*
-
-### Pruebas de cada endpoint
-
-![GET /users](docs/images/ev08/05-get-users.png)
-*`GET /users`: 200 con las cabeceras personalizadas.*
-
-![GET /users/1](docs/images/ev08/06-get-user-by-id.png)
-*`GET /users/{user_id}`: 200.*
-
-![POST /users](docs/images/ev08/07-post-user-created.png)
-*`POST /users`: 201 Created.*
-
-![PUT /users/2](docs/images/ev08/08-put-user-updated.png)
-*`PUT /users/{user_id}`: 200, reemplazo completo.*
-
-![PATCH /users/3](docs/images/ev08/09-patch-user-updated.png)
-*`PATCH /users/{user_id}`: 200, actualización parcial de un solo campo.*
-
-![DELETE /users/4](docs/images/ev08/10-delete-user-204.png)
-*`DELETE /users/{user_id}`: 204 No Content, sin cuerpo.*
-
-### Errores controlados
-
-![Error 404](docs/images/ev08/11-error-404-user-not-found.png)
-*Buscar un usuario inexistente: 404 Not Found.*
-
-![Error 400 por correo duplicado](docs/images/ev08/12-error-400-duplicate-email.png)
-*Crear un usuario con un correo repetido: 400 Bad Request.*
-
-![Error 422](docs/images/ev08/13-error-422-validation.png)
-*Crear un usuario con datos inválidos: 422 Unprocessable Entity.*
-
-![Error 404 al actualizar](docs/images/ev08/14-error-404-update-nonexistent.png)
-*Actualizar un usuario inexistente: 404 Not Found.*
-
-![Error 400 por PATCH vacío](docs/images/ev08/15-error-400-empty-patch.png)
-*PATCH sin ningún campo: 400 Bad Request.*
-
-![Error 404 al eliminar](docs/images/ev08/16-error-404-delete-nonexistent.png)
-*Eliminar un usuario inexistente: 404 Not Found.*
-
 ## Evidencias de pruebas (EV09)
 
 ### Estructura del proyecto y base de datos
@@ -507,6 +612,64 @@ Pruebas funcionales de los seis endpoints y de los escenarios de error, ejecutad
 ![Error 404 al eliminar](docs/images/ev09/21-error-404-delete-nonexistent.png)
 *Eliminar un usuario inexistente: 404 Not Found.*
 
+## Evidencias de pruebas (EV08)
+
+Pruebas funcionales de los seis endpoints y de los escenarios de error, ejecutadas desde Swagger UI, ReDoc y Thunder Client.
+
+### Swagger UI y ReDoc
+
+![Swagger UI: vista general](docs/images/ev08/01-swagger-overview.png)
+*Título, versión 2.0.0, tag `Users` y los seis endpoints con su `summary`.*
+
+![Swagger UI: schemas](docs/images/ev08/02-swagger-schemas.png)
+*Schemas de entrada (`UserCreate`, `UserUpdate`, `UserPatch`) y de salida (`UserResponse`).*
+
+![ReDoc: vista general](docs/images/ev08/03-redoc-overview.png)
+*Documentación de la API en `/redoc`.*
+
+![ReDoc: detalle de un endpoint](docs/images/ev08/04-redoc-endpoint-detail.png)
+*Descripción y respuestas de `POST /users`.*
+
+### Pruebas de cada endpoint
+
+![GET /users](docs/images/ev08/05-get-users.png)
+*`GET /users`: 200 con las cabeceras personalizadas.*
+
+![GET /users/1](docs/images/ev08/06-get-user-by-id.png)
+*`GET /users/{user_id}`: 200.*
+
+![POST /users](docs/images/ev08/07-post-user-created.png)
+*`POST /users`: 201 Created.*
+
+![PUT /users/2](docs/images/ev08/08-put-user-updated.png)
+*`PUT /users/{user_id}`: 200, reemplazo completo.*
+
+![PATCH /users/3](docs/images/ev08/09-patch-user-updated.png)
+*`PATCH /users/{user_id}`: 200, actualización parcial de un solo campo.*
+
+![DELETE /users/4](docs/images/ev08/10-delete-user-204.png)
+*`DELETE /users/{user_id}`: 204 No Content, sin cuerpo.*
+
+### Errores controlados
+
+![Error 404](docs/images/ev08/11-error-404-user-not-found.png)
+*Buscar un usuario inexistente: 404 Not Found.*
+
+![Error 400 por correo duplicado](docs/images/ev08/12-error-400-duplicate-email.png)
+*Crear un usuario con un correo repetido: 400 Bad Request.*
+
+![Error 422](docs/images/ev08/13-error-422-validation.png)
+*Crear un usuario con datos inválidos: 422 Unprocessable Entity.*
+
+![Error 404 al actualizar](docs/images/ev08/14-error-404-update-nonexistent.png)
+*Actualizar un usuario inexistente: 404 Not Found.*
+
+![Error 400 por PATCH vacío](docs/images/ev08/15-error-400-empty-patch.png)
+*PATCH sin ningún campo: 400 Bad Request.*
+
+![Error 404 al eliminar](docs/images/ev08/16-error-404-delete-nonexistent.png)
+*Eliminar un usuario inexistente: 404 Not Found.*
+
 ## Evidencias de pruebas (EV07)
 
 ### Swagger UI
@@ -546,11 +709,9 @@ Pruebas funcionales de los seis endpoints y de los escenarios de error, ejecutad
 ![Error 422](docs/images/ev07/09-error-422-validation.png)
 *Datos inválidos: `422 Unprocessable Entity`.*
 
-
 ## Reflexión final sobre la persistencia (EV09)
 
 Hasta EV08 los usuarios vivían en una lista en memoria y desaparecían cada vez que el servidor se reiniciaba. Con SQLAlchemy y SQLite los datos se guardan en un archivo y siguen disponibles después de reiniciar el servidor. Separar el modelo SQLAlchemy (cómo se guarda un usuario) del schema Pydantic (cómo entra y sale por la API) permite que cada uno cambie sin afectar al otro, y los constraints de la base de datos (`nullable=False`, `unique=True`) protegen la integridad de los datos además de las validaciones de la API. La sesión de base de datos se entrega con `Depends(get_db)`, lo que reutiliza el mismo mecanismo de dependencias de EV08. [Completa con lo que más te costó o lo que más valoras de la persistencia.]
-
 
 ## Reflexión final sobre la evolución del proyecto (EV08)
 
@@ -560,167 +721,3 @@ En EV07 la API solo permitía consultar y crear usuarios, con todo el código en
 
 FastAPI permitió construir la API de `users` con poco código: los path y query parameters se declaran como argumentos de las funciones, Pydantic valida los datos de entrada y los `response_model` controlan lo que la API devuelve, todo apoyado en los tipos de Python. Además, la documentación interactiva se genera automáticamente y sirvió para probar cada endpoint sin herramientas externas. [Completa con lo que más te sirvió o te costó aprender.]
 
-## Schemas de dispositivos y préstamos
-
-### Dispositivos
-
-| Schema | Uso | Campos |
-|---|---|---|
-| `DeviceCreate` | Body de `POST /devices` y `PUT /devices/{device_id}` | `name`, `serial_number`, `device_type` (obligatorios) y `brand` (opcional) |
-| `DeviceUpdate` | Body de `PATCH /devices/{device_id}` | Los mismos campos, todos opcionales |
-| `DeviceResponse` | Respuesta de los endpoints de dispositivos | Todos los campos, incluidos `id`, `is_available` y `created_at` |
-
-`is_available` no se envía en las peticiones: el sistema lo actualiza al registrar y devolver préstamos.
-
-### Préstamos
-
-| Schema | Uso | Campos |
-|---|---|---|
-| `LoanCreate` | Body de `POST /loans` | `user_id` y `device_id` |
-| `LoanUpdate` | Actualización de un préstamo (la devolución se registra con `PATCH /loans/{loan_id}/return`) | `status` y `return_date`, opcionales |
-| `LoanResponse` | Respuesta de un préstamo | `id`, `user_id`, `device_id`, `loan_date`, `return_date` y `status` |
-| `LoanDetailResponse` | Préstamo con la información relacionada | Datos del préstamo más `user` y `device` anidados |
-
-Estados de préstamo (`LoanStatus`): `active`, `returned` y `overdue`.
-
-Ejemplo de `LoanDetailResponse`:
-
-```json
-{
-  "loan_id": 1,
-  "status": "active",
-  "loan_date": "2026-09-24T15:04:05.123456",
-  "return_date": null,
-  "user": {
-    "id": 1,
-    "name": "Ana Pérez",
-    "email": "ana@sena.edu.co"
-  },
-  "device": {
-    "id": 3,
-    "name": "Laptop Lenovo ThinkPad",
-    "serial_number": "LEN-2024-001",
-    "device_type": "laptop"
-  }
-}
-```
-
-## Endpoints de dispositivos
-
-| Método | Ruta | Descripción | Parámetros |
-|---|---|---|---|
-| GET | `/devices` | Lista dispositivos | Query opcionales: `device_type`, `is_available`, `brand`, `search` |
-| GET | `/devices/{device_id}` | Consulta un dispositivo por ID | Path: `device_id` (int) |
-| POST | `/devices` | Registra un dispositivo | Body JSON: `name`, `serial_number`, `device_type`, `brand` (opcional) |
-| PUT | `/devices/{device_id}` | Reemplaza por completo un dispositivo | Path: `device_id`. Body: los mismos campos |
-| PATCH | `/devices/{device_id}` | Actualiza parcialmente un dispositivo | Path: `device_id`. Body: uno o más campos |
-| DELETE | `/devices/{device_id}` | Elimina un dispositivo | Path: `device_id` |
-
-### Filtros de `GET /devices`
-
-| Parámetro | Ejemplo | Comportamiento |
-|---|---|---|
-| `device_type` | `?device_type=laptop` | Tipo exacto, sin distinguir mayúsculas |
-| `is_available` | `?is_available=true` | Dispositivos disponibles o prestados |
-| `brand` | `?brand=lenovo` | Marca exacta, sin distinguir mayúsculas |
-| `search` | `?search=thinkpad` | Texto contenido en el nombre, el número de serie, el tipo o la marca (`ilike` combinado con `or_`) |
-
-Los filtros se pueden combinar: `GET /devices?device_type=laptop&is_available=true`.
-
-### Ejemplos de peticiones
-
-```bash
-curl -X POST http://127.0.0.1:8000/devices \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Laptop Lenovo ThinkPad", "serial_number": "LEN-2024-001", "device_type": "laptop", "brand": "Lenovo"}'
-
-curl "http://127.0.0.1:8000/devices?brand=lenovo"
-curl "http://127.0.0.1:8000/devices?search=thinkpad"
-```
-
-Respuesta `201 Created` del POST:
-
-```json
-{
-  "id": 1,
-  "name": "Laptop Lenovo ThinkPad",
-  "serial_number": "LEN-2024-001",
-  "device_type": "laptop",
-  "brand": "Lenovo",
-  "is_available": true,
-  "created_at": "2026-09-24T15:04:05.123456"
-}
-```
-
-### Respuestas de error
-
-| Código | Caso |
-|---|---|
-| 404 Not Found | El dispositivo no existe |
-| 400 Bad Request | El número de serie ya está registrado, o el PATCH no trae ningún campo |
-| 409 Conflict | El dispositivo tiene préstamos registrados y no se puede eliminar |
-| 422 Unprocessable Entity | Datos inválidos o campos obligatorios ausentes |
-
-El número de serie se compara sin distinguir mayúsculas. `is_available` no se envía en las peticiones: cambia con los préstamos. Para quitar la marca de un dispositivo se usa el PUT, porque el PATCH ignora los campos vacíos.
-
-
-## Endpoints de préstamos
-
-| Método | Ruta | Descripción | Parámetros |
-|---|---|---|---|
-| GET | `/loans` | Lista los préstamos con su usuario y su dispositivo | — |
-| GET | `/loans/{loan_id}` | Consulta un préstamo por ID | Path: `loan_id` (int) |
-| POST | `/loans` | Presta un dispositivo a un usuario | Body JSON: `user_id`, `device_id` |
-| PATCH | `/loans/{loan_id}/return` | Registra la devolución de un dispositivo | Path: `loan_id` (int) |
-
-### Reglas de negocio
-
-**`POST /loans`**
-
-1. Valida que el usuario exista.
-2. Valida que el dispositivo exista.
-3. Valida que el dispositivo esté disponible.
-4. Crea el préstamo con estado `active`.
-5. Cambia `is_available` del dispositivo a `False`.
-
-**`PATCH /loans/{loan_id}/return`**
-
-1. Valida que el préstamo exista y que no haya sido devuelto.
-2. Marca el préstamo como `returned`.
-3. Asigna la fecha de devolución (`return_date`).
-4. Cambia `is_available` del dispositivo a `True`.
-
-Cada operación se guarda en una sola transacción: el préstamo y el estado del dispositivo cambian juntos.
-
-### Ejemplos de peticiones
-
-```bash
-curl -X POST http://127.0.0.1:8000/loans \
-  -H "Content-Type: application/json" \
-  -d '{"user_id": 1, "device_id": 1}'
-
-curl -X PATCH http://127.0.0.1:8000/loans/1/return
-```
-
-Respuesta `201 Created` del POST:
-
-```json
-{
-  "id": 1,
-  "user_id": 1,
-  "device_id": 1,
-  "loan_date": "2026-09-24T15:04:05.123456",
-  "return_date": null,
-  "status": "active"
-}
-```
-
-### Respuestas de error
-
-| Código | Caso |
-|---|---|
-| 404 Not Found | El usuario, el dispositivo o el préstamo no existen |
-| 409 Conflict | El dispositivo no está disponible, o el préstamo ya fue devuelto |
-| 422 Unprocessable Entity | Datos inválidos (por ejemplo, `user_id` menor que 1 o campo ausente) |
-
-Un dispositivo con préstamos registrados, aunque ya estén devueltos, no se puede eliminar: `DELETE /devices/{device_id}` responde `409 Conflict`.

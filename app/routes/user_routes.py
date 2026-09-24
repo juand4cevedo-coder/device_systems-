@@ -19,7 +19,7 @@ def set_api_headers(response: Response) -> None:
     response.headers["X-API-Version"] = "1.0"
 
 
-@router.get("", response_model=list[UserResponse])
+@router.get("", response_model=list[UserResponse], status_code=status.HTTP_200_OK)
 def list_users(
     response: Response,
     role: UserRole | None = None,
@@ -29,7 +29,7 @@ def list_users(
     return user_service.list_users(role, is_active)
 
 
-@router.get("/{user_id}", response_model=UserResponse)
+@router.get("/{user_id}", response_model=UserResponse, status_code=status.HTTP_200_OK)
 def get_user(user_id: int, response: Response) -> User:
     set_api_headers(response)
     user = user_service.get_user_by_id(user_id)
@@ -51,7 +51,7 @@ def create_user(user_in: UserCreate, response: Response) -> User:
     return user_service.create_user(user_in)
 
 
-@router.put("/{user_id}", response_model=UserResponse)
+@router.put("/{user_id}", response_model=UserResponse, status_code=status.HTTP_200_OK)
 def update_user(user_id: int, user_in: UserUpdate, response: Response) -> User:
     set_api_headers(response)
     user = user_service.get_user_by_id(user_id)
@@ -68,7 +68,7 @@ def update_user(user_id: int, user_in: UserUpdate, response: Response) -> User:
     return user_service.update_user(user, user_in.model_dump())
 
 
-@router.patch("/{user_id}", response_model=UserResponse)
+@router.patch("/{user_id}", response_model=UserResponse, status_code=status.HTTP_200_OK)
 def patch_user(user_id: int, user_in: UserPatch, response: Response) -> User:
     set_api_headers(response)
     user = user_service.get_user_by_id(user_id)

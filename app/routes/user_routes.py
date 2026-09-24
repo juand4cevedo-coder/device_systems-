@@ -93,3 +93,14 @@ def patch_user(user_id: int, user_in: UserPatch, response: Response) -> User:
             )
 
     return user_service.update_user(user, changes)
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id: int, response: Response) -> None:
+    set_api_headers(response)
+    user = user_service.get_user_by_id(user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
+        )
+    user_service.delete_user(user)

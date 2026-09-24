@@ -35,3 +35,7 @@ def update_user(user: User, changes: dict[str, Any]) -> User:
     updated_user = user.model_copy(update=changes)
     users_db[users_db.index(user)] = updated_user
     return updated_user
+
+
+def delete_user(user: User) -> None:
+    users_db.remove(user)

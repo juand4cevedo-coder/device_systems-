@@ -115,6 +115,21 @@ Ambos responden `200 OK` con el usuario actualizado.
 | 400 Bad Request | El correo pertenece a otro usuario, o el PATCH no trae ningún campo |
 | 422 Unprocessable Entity | Datos inválidos, o falta un campo obligatorio en el PUT |
 
+| DELETE | `/users/{user_id}` | Elimina un usuario | Path: `user_id` |
+
+### Ejemplo de petición DELETE
+
+```bash
+curl -X DELETE http://127.0.0.1:8000/users/3
+```
+
+Responde `204 No Content`, sin cuerpo de respuesta.
+
+| Código | Caso |
+|---|---|
+| 204 No Content | Usuario eliminado correctamente |
+| 404 Not Found | El usuario no existe |
+
 ## Response models y cabeceras HTTP
 
 Todos los endpoints declaran un `response_model` (`UserResponse`), que define los campos que la API expone: `id`, `name`, `email`, `role` e `is_active`.

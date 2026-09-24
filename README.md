@@ -530,3 +530,48 @@ En EV07 la API solo permitía consultar y crear usuarios, con todo el código en
 ## Reflexión sobre FastAPI (EV07)
 
 FastAPI permitió construir la API de `users` con poco código: los path y query parameters se declaran como argumentos de las funciones, Pydantic valida los datos de entrada y los `response_model` controlan lo que la API devuelve, todo apoyado en los tipos de Python. Además, la documentación interactiva se genera automáticamente y sirvió para probar cada endpoint sin herramientas externas. [Completa con lo que más te sirvió o te costó aprender.]
+
+## Schemas de dispositivos y préstamos
+
+### Dispositivos
+
+| Schema | Uso | Campos |
+|---|---|---|
+| `DeviceCreate` | Body de `POST /devices` y `PUT /devices/{device_id}` | `name`, `serial_number`, `device_type` (obligatorios) y `brand` (opcional) |
+| `DeviceUpdate` | Body de `PATCH /devices/{device_id}` | Los mismos campos, todos opcionales |
+| `DeviceResponse` | Respuesta de los endpoints de dispositivos | Todos los campos, incluidos `id`, `is_available` y `created_at` |
+
+`is_available` no se envía en las peticiones: el sistema lo actualiza al registrar y devolver préstamos.
+
+### Préstamos
+
+| Schema | Uso | Campos |
+|---|---|---|
+| `LoanCreate` | Body de `POST /loans` | `user_id` y `device_id` |
+| `LoanUpdate` | Actualización de un préstamo (la devolución se registra con `PATCH /loans/{loan_id}/return`) | `status` y `return_date`, opcionales |
+| `LoanResponse` | Respuesta de un préstamo | `id`, `user_id`, `device_id`, `loan_date`, `return_date` y `status` |
+| `LoanDetailResponse` | Préstamo con la información relacionada | Datos del préstamo más `user` y `device` anidados |
+
+Estados de préstamo (`LoanStatus`): `active`, `returned` y `overdue`.
+
+Ejemplo de `LoanDetailResponse`:
+
+```json
+{
+  "loan_id": 1,
+  "status": "active",
+  "loan_date": "2026-09-24T15:04:05.123456",
+  "return_date": null,
+  "user": {
+    "id": 1,
+    "name": "Ana Pérez",
+    "email": "ana@sena.edu.co"
+  },
+  "device": {
+    "id": 3,
+    "name": "Laptop Lenovo ThinkPad",
+    "serial_number": "LEN-2024-001",
+    "device_type": "laptop"
+  }
+}
+```

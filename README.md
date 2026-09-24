@@ -313,3 +313,24 @@ La persistencia usa SQLAlchemy con SQLite. El archivo `device_systems.db` se cre
 | `role` | String | Obligatorio |
 | `is_active` | Boolean | Valor por defecto `True` |
 | `created_at` | DateTime | Fecha de creación (UTC) |
+
+## Modelo SQLAlchemy vs schema Pydantic
+
+| | Modelo SQLAlchemy | Schema Pydantic |
+|---|---|---|
+| Archivo | `app/models/user_model.py` | `app/schemas/user_schema.py` |
+| Representa | La tabla `users` de la base de datos | Los datos que entran y salen de la API |
+| Responsabilidad | Persistencia: tipos de columna y constraints (`nullable`, `unique`) | Validación y serialización: formato del correo, rol permitido, longitud del nombre |
+| Cuándo se usa | Al leer o escribir en la base de datos | Al recibir la petición y al construir la respuesta |
+| Clases | `User` | `UserCreate`, `UserUpdate`, `UserPatch`, `UserResponse` |
+
+Se mantienen separados para que la base de datos y el contrato de la API puedan evolucionar de forma independiente. Por ejemplo, el modelo puede tener columnas que la API no expone. `UserResponse` usa `from_attributes=True` para convertir un objeto del modelo en la respuesta de la API.
+
+### Schemas de usuario
+
+| Schema | Uso | Validaciones |
+|---|---|---|
+| `UserCreate` | Body de `POST /users` | `name` (mín. 3 caracteres), `email` válido, `role` permitido, `is_active` booleano |
+| `UserUpdate` | Body de `PUT /users/{user_id}` | Las mismas, con todos los campos obligatorios |
+| `UserPatch` | Body de `PATCH /users/{user_id}` | Las mismas, con todos los campos opcionales |
+| `UserResponse` | Respuesta de los endpoints | Se construye desde el modelo SQLAlchemy |

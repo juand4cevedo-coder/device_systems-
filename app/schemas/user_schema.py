@@ -33,6 +33,8 @@ class User(UserBase):
 class UserResponse(UserBase):
     """Modelo público de respuesta: lo que la API expone al cliente."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
 
 

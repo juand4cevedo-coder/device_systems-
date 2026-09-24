@@ -13,6 +13,10 @@ class LoanStatus(StrEnum):
 class LoanCreate(BaseModel):
     """Datos de entrada para registrar un préstamo."""
 
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"user_id": 1, "device_id": 3}]}
+    )
+
     user_id: int = Field(gt=0, description="ID del usuario que recibe el préstamo")
     device_id: int = Field(gt=0, description="ID del dispositivo prestado")
 
@@ -27,7 +31,21 @@ class LoanUpdate(BaseModel):
 class LoanResponse(BaseModel):
     """Modelo público de respuesta de un préstamo."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": 1,
+                    "user_id": 1,
+                    "device_id": 3,
+                    "loan_date": "2026-09-24T15:04:05.123456",
+                    "return_date": None,
+                    "status": "active",
+                }
+            ]
+        },
+    )
 
     id: int
     user_id: int
@@ -61,7 +79,26 @@ class LoanDeviceSummary(BaseModel):
 class LoanDetailResponse(BaseModel):
     """Préstamo con la información relacionada del usuario y del dispositivo."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "loan_id": 1,
+                    "status": "active",
+                    "loan_date": "2026-09-24T15:04:05.123456",
+                    "return_date": None,
+                    "user": {"id": 1, "name": "Ana Pérez", "email": "ana@sena.edu.co"},
+                    "device": {
+                        "id": 3,
+                        "name": "Laptop Lenovo ThinkPad",
+                        "serial_number": "LEN-2024-001",
+                        "device_type": "laptop",
+                    },
+                }
+            ]
+        },
+    )
 
     loan_id: int = Field(validation_alias="id")
     status: LoanStatus

@@ -633,3 +633,65 @@ Respuesta `201 Created` del POST:
 | 422 Unprocessable Entity | Datos inválidos o campos obligatorios ausentes |
 
 El número de serie se compara sin distinguir mayúsculas. `is_available` no se envía en las peticiones: cambia con los préstamos. Para quitar la marca de un dispositivo se usa el PUT, porque el PATCH ignora los campos vacíos.
+
+
+## Endpoints de préstamos
+
+| Método | Ruta | Descripción | Parámetros |
+|---|---|---|---|
+| GET | `/loans` | Lista los préstamos con su usuario y su dispositivo | — |
+| GET | `/loans/{loan_id}` | Consulta un préstamo por ID | Path: `loan_id` (int) |
+| POST | `/loans` | Presta un dispositivo a un usuario | Body JSON: `user_id`, `device_id` |
+| PATCH | `/loans/{loan_id}/return` | Registra la devolución de un dispositivo | Path: `loan_id` (int) |
+
+### Reglas de negocio
+
+**`POST /loans`**
+
+1. Valida que el usuario exista.
+2. Valida que el dispositivo exista.
+3. Valida que el dispositivo esté disponible.
+4. Crea el préstamo con estado `active`.
+5. Cambia `is_available` del dispositivo a `False`.
+
+**`PATCH /loans/{loan_id}/return`**
+
+1. Valida que el préstamo exista y que no haya sido devuelto.
+2. Marca el préstamo como `returned`.
+3. Asigna la fecha de devolución (`return_date`).
+4. Cambia `is_available` del dispositivo a `True`.
+
+Cada operación se guarda en una sola transacción: el préstamo y el estado del dispositivo cambian juntos.
+
+### Ejemplos de peticiones
+
+```bash
+curl -X POST http://127.0.0.1:8000/loans \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": 1, "device_id": 1}'
+
+curl -X PATCH http://127.0.0.1:8000/loans/1/return
+```
+
+Respuesta `201 Created` del POST:
+
+```json
+{
+  "id": 1,
+  "user_id": 1,
+  "device_id": 1,
+  "loan_date": "2026-09-24T15:04:05.123456",
+  "return_date": null,
+  "status": "active"
+}
+```
+
+### Respuestas de error
+
+| Código | Caso |
+|---|---|
+| 404 Not Found | El usuario, el dispositivo o el préstamo no existen |
+| 409 Conflict | El dispositivo no está disponible, o el préstamo ya fue devuelto |
+| 422 Unprocessable Entity | Datos inválidos (por ejemplo, `user_id` menor que 1 o campo ausente) |
+
+Un dispositivo con préstamos registrados, aunque ya estén devueltos, no se puede eliminar: `DELETE /devices/{device_id}` responde `409 Conflict`.

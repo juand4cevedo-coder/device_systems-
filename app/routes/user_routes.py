@@ -1,7 +1,10 @@
 from typing import Any
 
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
+
+from app.schemas.error_schema import error_responses
 
 from app.dependencies.database_dependency import get_db
 from app.dependencies.user_dependencies import (
@@ -10,6 +13,7 @@ from app.dependencies.user_dependencies import (
     validate_new_user,
     validate_user_changes,
     validate_user_replacement,
+    ensure_user_can_be_deleted,
 )
 from app.models.user_model import User
 from app.schemas.user_schema import (
@@ -19,7 +23,13 @@ from app.schemas.user_schema import (
     UserRole,
     UserUpdate,
 )
-from app.services import user_service
+from app.models.loan_model import Loan
+from app.schemas.loan_schema import LoanDetailResponse
+from app.models.loan_model import Loan
+from app.schemas.loan_schema import LoanDetailResponse
+from app.services import loan_service, user_service
+from app.services.loan_service import LoanFilters
+from app.services.loan_service import LoanFilters
 
 router = APIRouter(
     prefix="/users", tags=["Users"], dependencies=[Depends(set_api_headers)]
@@ -106,10 +116,38 @@ def patch_user(
     "/{user_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Eliminar un usuario",
-    description="Elimina el usuario indicado. Responde 404 si no existe.",
+    description="Elimina el usuario indicado. Responde 404 si no existe y 409 si tiene préstamos registrados.",
     response_description="Usuario eliminado; la respuesta no tiene cuerpo",
 )
 def delete_user(
-    user: User = Depends(get_user_or_404), db: Session = Depends(get_db)
+    user: User = Depends(ensure_user_can_be_deleted), db: Session = Depends(get_db)
 ) -> None:
     user_service.delete_user(db, user)
+
+
+@router.get(
+    "/{user_id}/loans",
+    response_model=list[LoanDetailResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Consultar los préstamos de un usuario",
+    description="Devuelve el historial de préstamos del usuario indicado, con los datos de cada dispositivo. Responde 404 si el usuario no existe.",
+    response_description="Préstamos del usuario",
+)
+def list_user_loans(
+    user: User = Depends(get_user_or_404), db: Session = Depends(get_db)
+) -> list[Loan]:
+    return loan_service.search_loans(db, LoanFilters(user_id=user.id))
+
+
+@router.get(
+    "/{user_id}/loans",
+    response_model=list[LoanDetailResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Consultar los préstamos de un usuario",
+    description="Devuelve el historial de préstamos del usuario indicado, con los datos de cada dispositivo. Responde 404 si el usuario no existe.",
+    response_description="Préstamos del usuario",
+)
+def list_user_loans(
+    user: User = Depends(get_user_or_404), db: Session = Depends(get_db)
+) -> list[Loan]:
+    return loan_service.search_loans(db, LoanFilters(user_id=user.id))

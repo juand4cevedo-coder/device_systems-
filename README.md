@@ -1,6 +1,6 @@
 # device_systems
 
-API REST para la gestión de usuarios del sistema device_systems, construida con FastAPI. Implementa el CRUD completo del recurso `users`, con validación de datos (Pydantic v2), manejo de errores con códigos HTTP, dependencias reutilizables (`Depends()`) y documentación automática con Swagger/OpenAPI.
+API REST para la gestión de usuarios, dispositivos y préstamos del sistema device_systems, construida con FastAPI. Implementa el CRUD completo de usuarios y dispositivos, la gestión de préstamos con reglas de negocio, consultas con joins y filtros avanzados, validación de datos (Pydantic v2), manejo de errores con códigos HTTP, dependencias reutilizables (`Depends()`), persistencia con SQLAlchemy y SQLite, migraciones con Alembic y documentación automática con Swagger/OpenAPI.
 
 ## Tecnologías utilizadas
 
@@ -13,6 +13,7 @@ API REST para la gestión de usuarios del sistema device_systems, construida con
 - Git, GitHub y GitFlow: control de versiones
 - [SQLAlchemy](https://www.sqlalchemy.org/): ORM para la persistencia de datos
 - SQLite: base de datos relacional de desarrollo
+- [Alembic](https://alembic.sqlalchemy.org/): migraciones de la base de datos
 
 ## Requisitos
 
@@ -27,9 +28,11 @@ uv sync
 
 ## Ejecución del servidor
 
+Antes de iniciar el servidor por primera vez, crea la base de datos con las migraciones: uv run alembic upgrade head. Ejecuta los comandos siempre desde la raíz del proyecto.
+
 ```bash
 uv run uvicorn app.main:app --reload
-```
+``` 
 
 Documentación interactiva: http://127.0.0.1:8000/docs
 
@@ -40,41 +43,58 @@ device_systems/
 ├── app/
 │   ├── main.py
 │   ├── database/
-│   │   └── connection.py
+│   │   ├── connection.py
+│   │   └── migration_check.py
 │   ├── models/
-│   │   └── user_model.py
+│   │   ├── user_model.py
+│   │   ├── device_model.py
+│   │   └── loan_model.py
 │   ├── schemas/
-│   │   └── user_schema.py
+│   │   ├── user_schema.py
+│   │   ├── device_schema.py
+│   │   ├── loan_schema.py
+│   │   └── error_schema.py
 │   ├── routes/
-│   │   └── user_routes.py
+│   │   ├── user_routes.py
+│   │   ├── device_routes.py
+│   │   └── loan_routes.py
 │   ├── services/
-│   │   └── user_service.py
+│   │   ├── user_service.py
+│   │   ├── device_service.py
+│   │   └── loan_service.py
 │   └── dependencies/
 │       ├── database_dependency.py
-│       └── user_dependencies.py
+│       ├── user_dependencies.py
+│       ├── device_dependencies.py
+│       └── loan_dependencies.py
+├── alembic/
+│   ├── env.py
+│   └── versions/
 ├── docs/
 │   └── images/
+├── alembic.ini
 ├── CHANGELOG.md
 ├── pyproject.toml
 ├── requirements.txt
 └── README.md
 ```
 
-`device_systems.db` se genera al iniciar la aplicación y no se versiona.
+`device_systems.db` se genera al aplicar las migraciones y no se versiona.
 
 | Carpeta | Responsabilidad |
 |---|---|
-| `database` | Conexión a la base de datos: engine, sesión y base declarativa |
-| `models` | Modelos SQLAlchemy: tablas de la base de datos |
-| `schemas` | Modelos Pydantic de entrada y salida |
+| `database` | Conexión a la base de datos (engine, sesión, base declarativa) y comprobación de migraciones al arrancar |
+| `models` | Modelos SQLAlchemy: tablas `users`, `devices` y `loans` y sus relaciones |
+| `schemas` | Modelos Pydantic de entrada y salida, y el formato de los errores |
 | `routes` | Definición de endpoints |
 | `services` | Lógica de negocio y consultas a la base de datos |
-| `dependencies` | Funciones reutilizables con `Depends()`, incluida la sesión de base de datos |
+| `dependencies` | Funciones reutilizables con `Depends()`: sesión, búsquedas por ID, validaciones y reglas de negocio |
+| `alembic` | Migraciones que versionan el esquema de la base de datos |
 
 
 ## Base de datos (SQLAlchemy)
 
-La persistencia usa SQLAlchemy con SQLite. El archivo `device_systems.db` se crea automáticamente al iniciar la aplicación y no se versiona.
+El archivo device_systems.db se crea automáticamente al iniciar la aplicación y no se versiona. por El archivo device_systems.db se crea al aplicar las migraciones de Alembic y no se versiona.
 
 | Componente | Archivo | Descripción |
 |---|---|---|
@@ -82,6 +102,32 @@ La persistencia usa SQLAlchemy con SQLite. El archivo `device_systems.db` se cre
 | `SessionLocal` | `app/database/connection.py` | Fábrica de sesiones |
 | `Base` | `app/database/connection.py` | Base declarativa de los modelos |
 | `get_db` | `app/dependencies/database_dependency.py` | Dependencia que entrega una sesión por petición y la cierra al terminar |
+
+## Migraciones con Alembic
+
+El esquema de la base de datos se versiona con Alembic. Las migraciones están en `alembic/versions/`.
+
+| Comando | Uso |
+|---|---|
+| `uv run alembic upgrade head` | Aplica todas las migraciones pendientes |
+| `uv run alembic revision --autogenerate -m "mensaje"` | Genera una migración a partir de los cambios en los modelos |
+| `uv run alembic current` | Muestra la revisión aplicada en la base de datos |
+| `uv run alembic history` | Lista el historial de migraciones |
+| `uv run alembic downgrade -1` | Revierte la última migración |
+
+Alembic toma la URL de conexión y la metadata de SQLAlchemy desde `app/database/connection.py` y `app/models`. Usa el modo *batch* (`render_as_batch=True`), porque SQLite no soporta la mayoría de las instrucciones `ALTER TABLE`.
+
+### Errores al aplicar migraciones
+
+Al iniciar, la API comprueba que la base de datos esté en la última revisión de Alembic. Si no lo está, se detiene con un mensaje que indica cómo solucionarlo, en lugar de fallar más tarde en una petición.
+
+| Situación | Mensaje | Solución |
+|---|---|---|
+| La base no está migrada o está desactualizada | `RuntimeError: La base de datos no está actualizada ... Ejecuta: uv run alembic upgrade head` | Ejecutar `uv run alembic upgrade head` |
+| Al generar una migración con la base desactualizada | `Target database is not up to date` | Ejecutar primero `uv run alembic upgrade head` |
+| La base se creó fuera de Alembic y las tablas ya existen | `table ... already exists` | En desarrollo, borrar `device_systems.db` y volver a ejecutar `uv run alembic upgrade head` |
+
+Cada migración incluye `downgrade()`, por lo que se puede revertir con `uv run alembic downgrade -1`.
 
 ### Modelo `User` (tabla `users`)
 
@@ -115,6 +161,51 @@ La persistencia usa SQLAlchemy con SQLite. El archivo `device_systems.db` se cre
 | Clases | `User` | `UserCreate`, `UserUpdate`, `UserPatch`, `UserResponse` |
 
 Se mantienen separados para que la base de datos y el contrato de la API puedan evolucionar de forma independiente. Por ejemplo, el modelo puede tener columnas que la API no expone. `UserResponse` usa `from_attributes=True` para convertir un objeto del modelo en la respuesta de la API.
+
+## Schemas de dispositivos y préstamos
+
+### Dispositivos
+
+| Schema | Uso | Campos |
+|---|---|---|
+| `DeviceCreate` | Body de `POST /devices` y `PUT /devices/{device_id}` | `name`, `serial_number`, `device_type` (obligatorios) y `brand` (opcional) |
+| `DeviceUpdate` | Body de `PATCH /devices/{device_id}` | Los mismos campos, todos opcionales |
+| `DeviceResponse` | Respuesta de los endpoints de dispositivos | Todos los campos, incluidos `id`, `is_available` y `created_at` |
+
+`is_available` no se envía en las peticiones: el sistema lo actualiza al registrar y devolver préstamos.
+
+### Préstamos
+
+| Schema | Uso | Campos |
+|---|---|---|
+| `LoanCreate` | Body de `POST /loans` | `user_id` y `device_id` |
+| `LoanUpdate` | Actualización de un préstamo (la devolución se registra con `PATCH /loans/{loan_id}/return`) | `status` y `return_date`, opcionales |
+| `LoanResponse` | Respuesta de un préstamo | `id`, `user_id`, `device_id`, `loan_date`, `return_date` y `status` |
+| `LoanDetailResponse` | Préstamo con la información relacionada | Datos del préstamo más `user` y `device` anidados |
+
+Estados de préstamo (`LoanStatus`): `active`, `returned` y `overdue`.
+
+Ejemplo de `LoanDetailResponse`:
+
+```json
+{
+  "loan_id": 1,
+  "status": "active",
+  "loan_date": "2026-09-24T15:04:05.123456",
+  "return_date": null,
+  "user": {
+    "id": 1,
+    "name": "Ana Pérez",
+    "email": "ana@sena.edu.co"
+  },
+  "device": {
+    "id": 3,
+    "name": "Laptop Lenovo ThinkPad",
+    "serial_number": "LEN-2024-001",
+    "device_type": "laptop"
+  }
+}
+```
 
 ## Endpoints
 
@@ -226,6 +317,125 @@ Las respuestas exitosas incluyen estas cabeceras personalizadas:
 | `X-App-Name` | `device_systems` |
 | `X-API-Version` | `2.1` |
 
+## Endpoints de dispositivos
+
+| Método | Ruta | Descripción | Parámetros |
+|---|---|---|---|
+| GET | `/devices` | Lista dispositivos | Query opcionales: `device_type`, `is_available`, `brand`, `search` |
+| GET | `/devices/{device_id}` | Consulta un dispositivo por ID | Path: `device_id` (int) |
+| POST | `/devices` | Registra un dispositivo | Body JSON: `name`, `serial_number`, `device_type`, `brand` (opcional) |
+| PUT | `/devices/{device_id}` | Reemplaza por completo un dispositivo | Path: `device_id`. Body: los mismos campos |
+| PATCH | `/devices/{device_id}` | Actualiza parcialmente un dispositivo | Path: `device_id`. Body: uno o más campos |
+| DELETE | `/devices/{device_id}` | Elimina un dispositivo | Path: `device_id` |
+
+### Filtros de `GET /devices`
+
+| Parámetro | Ejemplo | Comportamiento |
+|---|---|---|
+| `device_type` | `?device_type=laptop` | Tipo exacto, sin distinguir mayúsculas |
+| `is_available` | `?is_available=true` | Dispositivos disponibles o prestados |
+| `brand` | `?brand=lenovo` | Marca exacta, sin distinguir mayúsculas |
+| `search` | `?search=thinkpad` | Texto contenido en el nombre, el número de serie, el tipo o la marca (`ilike` combinado con `or_`) |
+
+Los filtros se pueden combinar: `GET /devices?device_type=laptop&is_available=true`.
+
+### Ejemplos de peticiones
+
+```bash
+curl -X POST http://127.0.0.1:8000/devices \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Laptop Lenovo ThinkPad", "serial_number": "LEN-2024-001", "device_type": "laptop", "brand": "Lenovo"}'
+
+curl "http://127.0.0.1:8000/devices?brand=lenovo"
+curl "http://127.0.0.1:8000/devices?search=thinkpad"
+```
+
+Respuesta `201 Created` del POST:
+
+```json
+{
+  "id": 1,
+  "name": "Laptop Lenovo ThinkPad",
+  "serial_number": "LEN-2024-001",
+  "device_type": "laptop",
+  "brand": "Lenovo",
+  "is_available": true,
+  "created_at": "2026-09-24T15:04:05.123456"
+}
+```
+
+### Respuestas de error
+
+| Código | Caso |
+|---|---|
+| 404 Not Found | El dispositivo no existe |
+| 400 Bad Request | El número de serie ya está registrado, o el PATCH no trae ningún campo |
+| 409 Conflict | El dispositivo tiene préstamos registrados y no se puede eliminar |
+| 422 Unprocessable Entity | Datos inválidos o campos obligatorios ausentes |
+
+El número de serie se compara sin distinguir mayúsculas. `is_available` no se envía en las peticiones: cambia con los préstamos. Para quitar la marca de un dispositivo se usa el PUT, porque el PATCH ignora los campos vacíos.
+
+## Endpoints de préstamos
+
+| Método | Ruta | Descripción | Parámetros |
+|---|---|---|---|
+| GET | `/loans` | Lista los préstamos con su usuario y su dispositivo | — |
+| GET | `/loans/{loan_id}` | Consulta un préstamo por ID | Path: `loan_id` (int) |
+| POST | `/loans` | Presta un dispositivo a un usuario | Body JSON: `user_id`, `device_id` |
+| PATCH | `/loans/{loan_id}/return` | Registra la devolución de un dispositivo | Path: `loan_id` (int) |
+
+### Reglas de negocio
+
+**`POST /loans`**
+
+1. Valida que el usuario exista.
+2. Valida que el dispositivo exista.
+3. Valida que el dispositivo esté disponible.
+4. Crea el préstamo con estado `active`.
+5. Cambia `is_available` del dispositivo a `False`.
+
+**`PATCH /loans/{loan_id}/return`**
+
+1. Valida que el préstamo exista y que no haya sido devuelto.
+2. Marca el préstamo como `returned`.
+3. Asigna la fecha de devolución (`return_date`).
+4. Cambia `is_available` del dispositivo a `True`.
+
+Cada operación se guarda en una sola transacción: el préstamo y el estado del dispositivo cambian juntos.
+
+### Ejemplos de peticiones
+
+```bash
+curl -X POST http://127.0.0.1:8000/loans \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": 1, "device_id": 1}'
+
+curl -X PATCH http://127.0.0.1:8000/loans/1/return
+```
+
+Respuesta `201 Created` del POST:
+
+```json
+{
+  "id": 1,
+  "user_id": 1,
+  "device_id": 1,
+  "loan_date": "2026-09-24T15:04:05.123456",
+  "return_date": null,
+  "status": "active"
+}
+```
+
+### Respuestas de error
+
+| Código | Caso |
+|---|---|
+| 404 Not Found | El usuario, el dispositivo o el préstamo no existen |
+| 409 Conflict | El dispositivo no está disponible, o el préstamo ya fue devuelto |
+| 422 Unprocessable Entity | Datos inválidos (por ejemplo, `user_id` menor que 1 o campo ausente) |
+
+Un dispositivo con préstamos registrados, aunque ya estén devueltos, no se puede eliminar: `DELETE /devices/{device_id}` responde `409 Conflict`.
+
 ## Operaciones CRUD sobre la base de datos
 
 Los servicios de `app/services/user_service.py` reciben la sesión de base de datos y ejecutan las consultas con SQLAlchemy:
@@ -267,6 +477,12 @@ Los datos persisten entre reinicios del servidor. La base de datos comienza vac�
 | Correo duplicado | `POST`, `PUT` y `PATCH` | 400 Bad Request |
 | Actualización sin datos | `PATCH /users/{user_id}` | 400 Bad Request |
 | Datos inválidos | Validación Pydantic | 422 Unprocessable Entity |
+| Registro creado | `POST /devices`, `POST /loans` | 201 Created |
+| Devolución exitosa | `PATCH /loans/{loan_id}/return` | 200 OK |
+| Eliminación exitosa | `DELETE` de usuarios y dispositivos | 204 No Content |
+| Dato duplicado | Correo o número de serie ya registrados | 400 Bad Request |
+| Regla de negocio incumplida | Dispositivo no disponible, préstamo ya devuelto, o eliminar un usuario o dispositivo con préstamos | 409 Conflict |
+| Filtros inválidos | Estado, fecha o identificador con formato incorrecto, o rango de fechas invertido | 422 Unprocessable Entity |
 
 ## Manejo de errores
 
@@ -276,6 +492,11 @@ Los datos persisten entre reinicios del servidor. La base de datos comienza vac�
 | Correo duplicado | 400 | `{"detail": "El correo ya está registrado"}` |
 | PATCH sin ningún campo | 400 | `{"detail": "Debe enviar al menos un campo para actualizar"}` |
 | Rol no permitido o datos inválidos | 422 | Lista de errores de validación de Pydantic en `detail` |
+| Dispositivo o préstamo no encontrado | 404 | `{"detail": "Dispositivo no encontrado"}` o `{"detail": "Préstamo no encontrado"}` |
+| Número de serie duplicado | 400 | `{"detail": "El número de serie ya está registrado"}` |
+| Dispositivo no disponible | 409 | `{"detail": "El dispositivo no está disponible"}` |
+| Préstamo ya devuelto | 409 | `{"detail": "El préstamo ya fue devuelto"}` |
+| Eliminar un usuario o dispositivo con préstamos | 409 | `{"detail": "No se puede eliminar un usuario con préstamos registrados"}` (o dispositivo) |
 
 ## Dependency Injection con Depends()
 
@@ -318,6 +539,12 @@ Cada endpoint declara `summary`, `description` y `response_description`, por lo 
 
 Swagger/OpenAPI permite probar cada endpoint desde el navegador sin herramientas externas, y mantiene la documentación siempre sincronizada con el código.
 
+Además:
+
+- Los endpoints se agrupan por tags: `Users`, `Devices` y `Loans`.
+- Cada endpoint declara sus respuestas de error esperadas (400, 404 y 409, según el caso) con el schema `ErrorResponse`. El 422 de validación lo agrega FastAPI.
+- Los schemas de entrada y de respuesta incluyen ejemplos, que Swagger usa para precargar los cuerpos de las peticiones.
+
 ## Flujo de trabajo Git
 
 El proyecto sigue GitFlow:
@@ -330,64 +557,6 @@ El proyecto sigue GitFlow:
 | `release/*` | Preparación de cada versión antes de pasar a `main` |
 
 Los commits siguen Conventional Commits: `tipo(scope): descripción` (por ejemplo, `feat(users): add POST /users`).
-
-## Evidencias de pruebas (EV08)
-
-Pruebas funcionales de los seis endpoints y de los escenarios de error, ejecutadas desde Swagger UI, ReDoc y Thunder Client.
-
-### Swagger UI y ReDoc
-
-![Swagger UI: vista general](docs/images/ev08/01-swagger-overview.png)
-*Título, versión 2.0.0, tag `Users` y los seis endpoints con su `summary`.*
-
-![Swagger UI: schemas](docs/images/ev08/02-swagger-schemas.png)
-*Schemas de entrada (`UserCreate`, `UserUpdate`, `UserPatch`) y de salida (`UserResponse`).*
-
-![ReDoc: vista general](docs/images/ev08/03-redoc-overview.png)
-*Documentación de la API en `/redoc`.*
-
-![ReDoc: detalle de un endpoint](docs/images/ev08/04-redoc-endpoint-detail.png)
-*Descripción y respuestas de `POST /users`.*
-
-### Pruebas de cada endpoint
-
-![GET /users](docs/images/ev08/05-get-users.png)
-*`GET /users`: 200 con las cabeceras personalizadas.*
-
-![GET /users/1](docs/images/ev08/06-get-user-by-id.png)
-*`GET /users/{user_id}`: 200.*
-
-![POST /users](docs/images/ev08/07-post-user-created.png)
-*`POST /users`: 201 Created.*
-
-![PUT /users/2](docs/images/ev08/08-put-user-updated.png)
-*`PUT /users/{user_id}`: 200, reemplazo completo.*
-
-![PATCH /users/3](docs/images/ev08/09-patch-user-updated.png)
-*`PATCH /users/{user_id}`: 200, actualización parcial de un solo campo.*
-
-![DELETE /users/4](docs/images/ev08/10-delete-user-204.png)
-*`DELETE /users/{user_id}`: 204 No Content, sin cuerpo.*
-
-### Errores controlados
-
-![Error 404](docs/images/ev08/11-error-404-user-not-found.png)
-*Buscar un usuario inexistente: 404 Not Found.*
-
-![Error 400 por correo duplicado](docs/images/ev08/12-error-400-duplicate-email.png)
-*Crear un usuario con un correo repetido: 400 Bad Request.*
-
-![Error 422](docs/images/ev08/13-error-422-validation.png)
-*Crear un usuario con datos inválidos: 422 Unprocessable Entity.*
-
-![Error 404 al actualizar](docs/images/ev08/14-error-404-update-nonexistent.png)
-*Actualizar un usuario inexistente: 404 Not Found.*
-
-![Error 400 por PATCH vacío](docs/images/ev08/15-error-400-empty-patch.png)
-*PATCH sin ningún campo: 400 Bad Request.*
-
-![Error 404 al eliminar](docs/images/ev08/16-error-404-delete-nonexistent.png)
-*Eliminar un usuario inexistente: 404 Not Found.*
 
 ## Evidencias de pruebas (EV09)
 
@@ -462,6 +631,134 @@ Pruebas funcionales de los seis endpoints y de los escenarios de error, ejecutad
 ![Error 404 al eliminar](docs/images/ev09/21-error-404-delete-nonexistent.png)
 *Eliminar un usuario inexistente: 404 Not Found.*
 
+## Evidencias de pruebas (EV10)
+
+### Alembic y base de datos
+
+![alembic init](docs/images/ev10/01-alembic-init.png)
+*Inicialización de Alembic con `alembic init alembic`.*
+
+![alembic revision --autogenerate](docs/images/ev10/02-alembic-revision-autogenerate.png)
+*Generación de la migración `create devices and loans tables`.*
+
+![alembic upgrade head](docs/images/ev10/03-alembic-upgrade-head.png)
+*Aplicación de la migración con `alembic upgrade head`.*
+
+![alembic history](docs/images/ev10/04-alembic-history.png)
+*Historial de migraciones con `alembic history`.*
+
+![Estructura de las tablas](docs/images/ev10/05-database-tables-structure.png)
+*Tablas `users`, `devices` y `loans` generadas, con sus claves foráneas.*
+
+### Swagger UI y ReDoc
+
+![Swagger UI: vista general](docs/images/ev10/06-swagger-overview.png)
+*Grupos `Users`, `Devices` y `Loans` en `/docs`, versión 2.2.0.*
+
+![Swagger UI: schemas](docs/images/ev10/07-swagger-schemas.png)
+*Schemas de dispositivos, préstamos y errores.*
+
+![Swagger UI: respuestas de POST /loans](docs/images/ev10/08-swagger-loans-errors.png)
+*Códigos de respuesta esperados de `POST /loans`.*
+
+![ReDoc](docs/images/ev10/09-redoc-overview.png)
+*Documentación en `/redoc`.*
+
+### Pruebas funcionales mínimas
+
+![Test 2](docs/images/ev10/10-test02-create-user.png)
+*2. Crear un usuario: 201 Created.*
+
+![Test 3](docs/images/ev10/11-test03-create-device.png)
+*3. Crear un dispositivo: 201 Created.*
+
+![Test 4](docs/images/ev10/12-test04-create-loan.png)
+*4. Crear un préstamo: 201 Created, con estado `active`.*
+
+![Test 5](docs/images/ev10/13-test05-device-unavailable-409.png)
+*5. Intentar prestar un dispositivo no disponible: 409 Conflict.*
+
+![Test 6](docs/images/ev10/14-test06-loans-details-join.png)
+*6. Listar préstamos con la información del usuario y del dispositivo (consulta con `JOIN`).*
+
+![Test 7](docs/images/ev10/15-test07-filter-by-status.png)
+*7. Filtrar préstamos por estado.*
+
+![Test 8](docs/images/ev10/16-test08-filter-by-device-type.png)
+*8. Filtrar préstamos por tipo de dispositivo.*
+
+![Test 9](docs/images/ev10/17-test09-user-loans.png)
+*9. Consultar los préstamos de un usuario.*
+
+![Test 10](docs/images/ev10/18-test10-return-device.png)
+*10. Devolver un dispositivo: el préstamo pasa a `returned`.*
+
+![Test 11](docs/images/ev10/19-test11-device-available-again.png)
+*11. El dispositivo vuelve a estar disponible.*
+
+![Test 12](docs/images/ev10/20-test12-device-loan-history.png)
+*12. Historial de préstamos del dispositivo.*
+
+La prueba 1, ejecutar las migraciones con Alembic, está documentada en la sección "Alembic y base de datos".
+
+## Evidencias de pruebas (EV08)
+
+Pruebas funcionales de los seis endpoints y de los escenarios de error, ejecutadas desde Swagger UI, ReDoc y Thunder Client.
+
+### Swagger UI y ReDoc
+
+![Swagger UI: vista general](docs/images/ev08/01-swagger-overview.png)
+*Título, versión 2.0.0, tag `Users` y los seis endpoints con su `summary`.*
+
+![Swagger UI: schemas](docs/images/ev08/02-swagger-schemas.png)
+*Schemas de entrada (`UserCreate`, `UserUpdate`, `UserPatch`) y de salida (`UserResponse`).*
+
+![ReDoc: vista general](docs/images/ev08/03-redoc-overview.png)
+*Documentación de la API en `/redoc`.*
+
+![ReDoc: detalle de un endpoint](docs/images/ev08/04-redoc-endpoint-detail.png)
+*Descripción y respuestas de `POST /users`.*
+
+### Pruebas de cada endpoint
+
+![GET /users](docs/images/ev08/05-get-users.png)
+*`GET /users`: 200 con las cabeceras personalizadas.*
+
+![GET /users/1](docs/images/ev08/06-get-user-by-id.png)
+*`GET /users/{user_id}`: 200.*
+
+![POST /users](docs/images/ev08/07-post-user-created.png)
+*`POST /users`: 201 Created.*
+
+![PUT /users/2](docs/images/ev08/08-put-user-updated.png)
+*`PUT /users/{user_id}`: 200, reemplazo completo.*
+
+![PATCH /users/3](docs/images/ev08/09-patch-user-updated.png)
+*`PATCH /users/{user_id}`: 200, actualización parcial de un solo campo.*
+
+![DELETE /users/4](docs/images/ev08/10-delete-user-204.png)
+*`DELETE /users/{user_id}`: 204 No Content, sin cuerpo.*
+
+### Errores controlados
+
+![Error 404](docs/images/ev08/11-error-404-user-not-found.png)
+*Buscar un usuario inexistente: 404 Not Found.*
+
+![Error 400 por correo duplicado](docs/images/ev08/12-error-400-duplicate-email.png)
+*Crear un usuario con un correo repetido: 400 Bad Request.*
+
+![Error 422](docs/images/ev08/13-error-422-validation.png)
+*Crear un usuario con datos inválidos: 422 Unprocessable Entity.*
+
+![Error 404 al actualizar](docs/images/ev08/14-error-404-update-nonexistent.png)
+*Actualizar un usuario inexistente: 404 Not Found.*
+
+![Error 400 por PATCH vacío](docs/images/ev08/15-error-400-empty-patch.png)
+*PATCH sin ningún campo: 400 Bad Request.*
+
+![Error 404 al eliminar](docs/images/ev08/16-error-404-delete-nonexistent.png)
+*Eliminar un usuario inexistente: 404 Not Found.*
+
 ## Evidencias de pruebas (EV07)
 
 ### Swagger UI
@@ -501,11 +798,9 @@ Pruebas funcionales de los seis endpoints y de los escenarios de error, ejecutad
 ![Error 422](docs/images/ev07/09-error-422-validation.png)
 *Datos inválidos: `422 Unprocessable Entity`.*
 
-
 ## Reflexión final sobre la persistencia (EV09)
 
 Hasta EV08 los usuarios vivían en una lista en memoria y desaparecían cada vez que el servidor se reiniciaba. Con SQLAlchemy y SQLite los datos se guardan en un archivo y siguen disponibles después de reiniciar el servidor. Separar el modelo SQLAlchemy (cómo se guarda un usuario) del schema Pydantic (cómo entra y sale por la API) permite que cada uno cambie sin afectar al otro, y los constraints de la base de datos (`nullable=False`, `unique=True`) protegen la integridad de los datos además de las validaciones de la API. La sesión de base de datos se entrega con `Depends(get_db)`, lo que reutiliza el mismo mecanismo de dependencias de EV08. [Completa con lo que más te costó o lo que más valoras de la persistencia.]
-
 
 ## Reflexión final sobre la evolución del proyecto (EV08)
 
@@ -514,3 +809,6 @@ En EV07 la API solo permitía consultar y crear usuarios, con todo el código en
 ## Reflexión sobre FastAPI (EV07)
 
 FastAPI permitió construir la API de `users` con poco código: los path y query parameters se declaran como argumentos de las funciones, Pydantic valida los datos de entrada y los `response_model` controlan lo que la API devuelve, todo apoyado en los tipos de Python. Además, la documentación interactiva se genera automáticamente y sirvió para probar cada endpoint sin herramientas externas. [Completa con lo que más te sirvió o te costó aprender.]
+
+
+El trabajo de EV10 se desarrolló en la rama `device_systems_alembic_relaciones`, nombre exigido por la guía, que se integra a `develop` y llega a `main` con el release `2.2.0`.

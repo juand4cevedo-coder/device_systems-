@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
+from app.schemas.error_schema import error_responses
+
 from app.dependencies.database_dependency import get_db
 from app.dependencies.loan_dependencies import (
     ensure_loan_can_be_returned,

@@ -4,6 +4,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
+from app.schemas.error_schema import error_responses
+
 from app.dependencies.database_dependency import get_db
 from app.dependencies.user_dependencies import (
     get_user_or_404,

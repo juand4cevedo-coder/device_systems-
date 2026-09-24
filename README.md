@@ -27,9 +27,11 @@ uv sync
 
 ## Ejecución del servidor
 
+Antes de iniciar el servidor por primera vez, crea la base de datos con las migraciones: uv run alembic upgrade head. Ejecuta los comandos siempre desde la raíz del proyecto.
+
 ```bash
 uv run uvicorn app.main:app --reload
-```
+``` 
 
 Documentación interactiva: http://127.0.0.1:8000/docs
 
@@ -74,7 +76,7 @@ device_systems/
 
 ## Base de datos (SQLAlchemy)
 
-La persistencia usa SQLAlchemy con SQLite. El archivo `device_systems.db` se crea automáticamente al iniciar la aplicación y no se versiona.
+El archivo device_systems.db se crea automáticamente al iniciar la aplicación y no se versiona. por El archivo device_systems.db se crea al aplicar las migraciones de Alembic y no se versiona.
 
 | Componente | Archivo | Descripción |
 |---|---|---|
@@ -82,6 +84,20 @@ La persistencia usa SQLAlchemy con SQLite. El archivo `device_systems.db` se cre
 | `SessionLocal` | `app/database/connection.py` | Fábrica de sesiones |
 | `Base` | `app/database/connection.py` | Base declarativa de los modelos |
 | `get_db` | `app/dependencies/database_dependency.py` | Dependencia que entrega una sesión por petición y la cierra al terminar |
+
+## Migraciones con Alembic
+
+El esquema de la base de datos se versiona con Alembic. Las migraciones están en `alembic/versions/`.
+
+| Comando | Uso |
+|---|---|
+| `uv run alembic upgrade head` | Aplica todas las migraciones pendientes |
+| `uv run alembic revision --autogenerate -m "mensaje"` | Genera una migración a partir de los cambios en los modelos |
+| `uv run alembic current` | Muestra la revisión aplicada en la base de datos |
+| `uv run alembic history` | Lista el historial de migraciones |
+| `uv run alembic downgrade -1` | Revierte la última migración |
+
+Alembic toma la URL de conexión y la metadata de SQLAlchemy desde `app/database/connection.py` y `app/models`. Usa el modo *batch* (`render_as_batch=True`), porque SQLite no soporta la mayoría de las instrucciones `ALTER TABLE`.
 
 ### Modelo `User` (tabla `users`)
 

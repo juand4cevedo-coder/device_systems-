@@ -88,6 +88,33 @@ Respuesta `201 Created`:
 | 400 Bad Request | El correo ya está registrado |
 | 422 Unprocessable Entity | Datos inválidos (nombre corto, email mal formado, rol no permitido) |
 
+| PUT | `/users/{user_id}` | Reemplaza por completo un usuario | Path: `user_id`. Body: `name`, `email`, `role`, `is_active` (todos obligatorios) |
+| PATCH | `/users/{user_id}` | Actualiza parcialmente un usuario | Path: `user_id`. Body: uno o más de `name`, `email`, `role`, `is_active` |
+
+### Ejemplos de peticiones PUT y PATCH
+
+```bash
+# PUT: reemplazo completo
+curl -X PUT http://127.0.0.1:8000/users/2 \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Carlos Gómez Ruiz", "email": "carlos@sena.edu.co", "role": "support", "is_active": true}'
+
+# PATCH: actualización parcial
+curl -X PATCH http://127.0.0.1:8000/users/3 \
+  -H "Content-Type: application/json" \
+  -d '{"role": "support"}'
+```
+
+Ambos responden `200 OK` con el usuario actualizado.
+
+### Respuestas de error de PUT y PATCH
+
+| Código | Caso |
+|---|---|
+| 404 Not Found | El usuario no existe |
+| 400 Bad Request | El correo pertenece a otro usuario, o el PATCH no trae ningún campo |
+| 422 Unprocessable Entity | Datos inválidos, o falta un campo obligatorio en el PUT |
+
 ## Response models y cabeceras HTTP
 
 Todos los endpoints declaran un `response_model` (`UserResponse`), que define los campos que la API expone: `id`, `name`, `email`, `role` e `is_active`.

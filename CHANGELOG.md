@@ -27,3 +27,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - Código reorganizado en capas: `routes`, `schemas`, `services`, `dependencies` y `data` (Fase 2).
 - Códigos de estado declarados explícitamente y errores controlados con `HTTPException` (Fases 5 y 6).
 - Cabecera `X-API-Version` actualizada a `2.0`.
+
+## [2.0.1] - AAAA-MM-DD
+
+### Fixed
+- Documentación de EV08 que no se incluyó en la versión 2.0.0: capturas de pruebas en `docs/images/ev08`, sección de tecnologías, evidencias y reflexión en el README.

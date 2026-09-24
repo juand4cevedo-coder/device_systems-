@@ -1,0 +1,79 @@
+from fastapi import APIRouter, HTTPException, Response, status
+
+from app.schemas.user_schema import User, UserCreate, UserResponse, UserRole
+
+router = APIRouter(prefix="/users")
+
+# Almacenamiento temporal en memoria; en EV08 pasa a app/data/users_db.py.
+users_db: list[User] = [
+    User(
+        id=1,
+        name="Ana Pérez",
+        email="ana@sena.edu.co",
+        role=UserRole.ADMIN,
+        is_active=True,
+    ),
+    User(
+        id=2,
+        name="Carlos Gómez",
+        email="carlos@sena.edu.co",
+        role=UserRole.SUPPORT,
+        is_active=True,
+    ),
+    User(
+        id=3,
+        name="Laura Torres",
+        email="laura@sena.edu.co",
+        role=UserRole.USER,
+        is_active=False,
+    ),
+]
+
+
+def set_api_headers(response: Response) -> None:
+    """Agrega las cabeceras personalizadas de la API a la respuesta."""
+    response.headers["X-App-Name"] = "device_systems"
+    response.headers["X-API-Version"] = "1.0"
+
+
+@router.get("", response_model=list[UserResponse])
+def list_users(
+    response: Response,
+    role: UserRole | None = None,
+    is_active: bool | None = None,
+) -> list[User]:
+    set_api_headers(response)
+    users = users_db
+    if role is not None:
+        users = [user for user in users if user.role == role]
+    if is_active is not None:
+        users = [user for user in users if user.is_active == is_active]
+    return users
+
+
+@router.get("/{user_id}", response_model=UserResponse)
+def get_user(user_id: int, response: Response) -> User:
+    set_api_headers(response)
+    user = next((user for user in users_db if user.id == user_id), None)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
+        )
+    return user
+
+
+@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def create_user(user_in: UserCreate, response: Response) -> User:
+    set_api_headers(response)
+    email = user_in.email.lower()
+    if any(user.email.lower() == email for user in users_db):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El correo ya está registrado",
+        )
+
+    new_user = User(
+        id=max((user.id for user in users_db), default=0) + 1, **user_in.model_dump()
+    )
+    users_db.append(new_user)
+    return new_user

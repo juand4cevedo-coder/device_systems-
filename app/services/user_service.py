@@ -1,41 +1,53 @@
 from typing import Any
-from app.data.users_db import users_db
-from app.schemas.user_schema import User, UserCreate, UserRole
+
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app.models.user_model import User
+from app.schemas.user_schema import UserCreate, UserOrderBy, UserRole
 
 
 def list_users(
-    role: UserRole | None = None, is_active: bool | None = None
+    db: Session,
+    role: UserRole | None = None,
+    is_active: bool | None = None,
+    order_by: UserOrderBy = UserOrderBy.CREATED_AT,
 ) -> list[User]:
-    users = users_db
+    query = select(User)
     if role is not None:
-        users = [user for user in users if user.role == role]
+        query = query.where(User.role == role)
     if is_active is not None:
-        users = [user for user in users if user.is_active == is_active]
-    return users
+        query = query.where(User.is_active == is_active)
+
+    sort_column = User.name if order_by == UserOrderBy.NAME else User.created_at
+    query = query.order_by(sort_column, User.id)
+    return list(db.scalars(query).all())
 
 
-def get_user_by_id(user_id: int) -> User | None:
-    return next((user for user in users_db if user.id == user_id), None)
+def get_user_by_id(db: Session, user_id: int) -> User | None:
+    return db.get(User, user_id)
 
 
-def get_user_by_email(email: str) -> User | None:
-    email = email.lower()
-    return next((user for user in users_db if user.email.lower() == email), None)
+def get_user_by_email(db: Session, email: str) -> User | None:
+    return db.scalar(select(User).where(func.lower(User.email) == email.lower()))
 
 
-def create_user(user_in: UserCreate) -> User:
-    new_user = User(
-        id=max((user.id for user in users_db), default=0) + 1, **user_in.model_dump()
-    )
-    users_db.append(new_user)
-    return new_user
+def create_user(db: Session, user_in: UserCreate) -> User:
+    user = User(**user_in.model_dump())
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
 
 
-def update_user(user: User, changes: dict[str, Any]) -> User:
-    updated_user = user.model_copy(update=changes)
-    users_db[users_db.index(user)] = updated_user
-    return updated_user
+def update_user(db: Session, user: User, changes: dict[str, Any]) -> User:
+    for field, value in changes.items():
+        setattr(user, field, value)
+    db.commit()
+    db.refresh(user)
+    return user
 
 
-def delete_user(user: User) -> None:
-    users_db.remove(user)
+def delete_user(db: Session, user: User) -> None:
+    db.delete(user)
+    db.commit()

@@ -1,7 +1,9 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, status
+from sqlalchemy.orm import Session
 
+from app.dependencies.database_dependency import get_db
 from app.dependencies.user_dependencies import (
     get_user_or_404,
     set_api_headers,
@@ -9,7 +11,14 @@ from app.dependencies.user_dependencies import (
     validate_user_changes,
     validate_user_replacement,
 )
-from app.schemas.user_schema import User, UserCreate, UserResponse, UserRole, UserUpdate
+from app.models.user_model import User
+from app.schemas.user_schema import (
+    UserCreate,
+    UserOrderBy,
+    UserResponse,
+    UserRole,
+    UserUpdate,
+)
 from app.services import user_service
 
 router = APIRouter(
@@ -22,13 +31,16 @@ router = APIRouter(
     response_model=list[UserResponse],
     status_code=status.HTTP_200_OK,
     summary="Listar usuarios",
-    description="Devuelve todos los usuarios. Se puede filtrar por rol (`role`) y por estado (`is_active`); los filtros se pueden combinar.",
+    description="Devuelve todos los usuarios. Se puede filtrar por rol (`role`) y por estado (`is_active`), combinando ambos filtros, y ordenar por nombre (`name`) o por fecha de creación (`created_at`, el valor por defecto).",
     response_description="Lista de usuarios que cumplen los filtros",
 )
 def list_users(
-    role: UserRole | None = None, is_active: bool | None = None
+    role: UserRole | None = None,
+    is_active: bool | None = None,
+    order_by: UserOrderBy = UserOrderBy.CREATED_AT,
+    db: Session = Depends(get_db),
 ) -> list[User]:
-    return user_service.list_users(role, is_active)
+    return user_service.list_users(db, role, is_active, order_by)
 
 
 @router.get(
@@ -51,8 +63,11 @@ def get_user(user: User = Depends(get_user_or_404)) -> User:
     description="Registra un nuevo usuario. Valida el nombre (mínimo 3 caracteres), el formato del correo y el rol. Responde 400 si el correo ya está registrado.",
     response_description="Usuario creado",
 )
-def create_user(user_in: UserCreate = Depends(validate_new_user)) -> User:
-    return user_service.create_user(user_in)
+def create_user(
+    user_in: UserCreate = Depends(validate_new_user),
+    db: Session = Depends(get_db),
+) -> User:
+    return user_service.create_user(db, user_in)
 
 
 @router.put(
@@ -66,8 +81,9 @@ def create_user(user_in: UserCreate = Depends(validate_new_user)) -> User:
 def update_user(
     user_in: UserUpdate = Depends(validate_user_replacement),
     user: User = Depends(get_user_or_404),
+    db: Session = Depends(get_db),
 ) -> User:
-    return user_service.update_user(user, user_in.model_dump())
+    return user_service.update_user(db, user, user_in.model_dump())
 
 
 @router.patch(
@@ -81,8 +97,9 @@ def update_user(
 def patch_user(
     changes: dict[str, Any] = Depends(validate_user_changes),
     user: User = Depends(get_user_or_404),
+    db: Session = Depends(get_db),
 ) -> User:
-    return user_service.update_user(user, changes)
+    return user_service.update_user(db, user, changes)
 
 
 @router.delete(
@@ -92,5 +109,7 @@ def patch_user(
     description="Elimina el usuario indicado. Responde 404 si no existe.",
     response_description="Usuario eliminado; la respuesta no tiene cuerpo",
 )
-def delete_user(user: User = Depends(get_user_or_404)) -> None:
-    user_service.delete_user(user)
+def delete_user(
+    user: User = Depends(get_user_or_404), db: Session = Depends(get_db)
+) -> None:
+    user_service.delete_user(db, user)

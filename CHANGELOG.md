@@ -32,3 +32,23 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Fixed
 - Documentación de EV08 que no se incluyó en la versión 2.0.0: capturas de pruebas en `docs/images/ev08`, sección de tecnologías, evidencias y reflexión en el README.
+
+## [2.1.0] - AAAA-MM-DD
+
+### Added
+- Persistencia con SQLAlchemy y SQLite: conexión, sesión, base declarativa y modelo `User` con sus constraints (EV09).
+- Dependencia `get_db` que entrega una sesión de base de datos por petición.
+- Parámetro `order_by` en `GET /users` para ordenar por nombre o fecha de creación.
+- Campo `created_at` en los usuarios y en `UserResponse`.
+- Evidencias de pruebas, estructura del proyecto y reflexión de EV09 en el README.
+
+### Changed
+- Servicios y dependencias trabajan sobre una sesión de base de datos en lugar de una lista en memoria.
+- Cabecera `X-API-Version` actualizada a `2.1`.
+- README reorganizado en un orden de lectura más claro.
+
+### Removed
+- Capa de datos en memoria (`app/data`) y schema interno `User`.
+
+### Fixed
+- Referencia del README a una captura de EV08 que no forma parte de las evidencias.

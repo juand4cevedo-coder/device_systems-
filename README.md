@@ -99,6 +99,18 @@ El esquema de la base de datos se versiona con Alembic. Las migraciones están e
 
 Alembic toma la URL de conexión y la metadata de SQLAlchemy desde `app/database/connection.py` y `app/models`. Usa el modo *batch* (`render_as_batch=True`), porque SQLite no soporta la mayoría de las instrucciones `ALTER TABLE`.
 
+### Errores al aplicar migraciones
+
+Al iniciar, la API comprueba que la base de datos esté en la última revisión de Alembic. Si no lo está, se detiene con un mensaje que indica cómo solucionarlo, en lugar de fallar más tarde en una petición.
+
+| Situación | Mensaje | Solución |
+|---|---|---|
+| La base no está migrada o está desactualizada | `RuntimeError: La base de datos no está actualizada ... Ejecuta: uv run alembic upgrade head` | Ejecutar `uv run alembic upgrade head` |
+| Al generar una migración con la base desactualizada | `Target database is not up to date` | Ejecutar primero `uv run alembic upgrade head` |
+| La base se creó fuera de Alembic y las tablas ya existen | `table ... already exists` | En desarrollo, borrar `device_systems.db` y volver a ejecutar `uv run alembic upgrade head` |
+
+Cada migración incluye `downgrade()`, por lo que se puede revertir con `uv run alembic downgrade -1`.
+
 ### Modelo `User` (tabla `users`)
 
 | Campo | Tipo | Restricción |
@@ -283,6 +295,12 @@ Los datos persisten entre reinicios del servidor. La base de datos comienza vac�
 | Correo duplicado | `POST`, `PUT` y `PATCH` | 400 Bad Request |
 | Actualización sin datos | `PATCH /users/{user_id}` | 400 Bad Request |
 | Datos inválidos | Validación Pydantic | 422 Unprocessable Entity |
+| Registro creado | `POST /devices`, `POST /loans` | 201 Created |
+| Devolución exitosa | `PATCH /loans/{loan_id}/return` | 200 OK |
+| Eliminación exitosa | `DELETE` de usuarios y dispositivos | 204 No Content |
+| Dato duplicado | Correo o número de serie ya registrados | 400 Bad Request |
+| Regla de negocio incumplida | Dispositivo no disponible, préstamo ya devuelto, o eliminar un usuario o dispositivo con préstamos | 409 Conflict |
+| Filtros inválidos | Estado, fecha o identificador con formato incorrecto, o rango de fechas invertido | 422 Unprocessable Entity |
 
 ## Manejo de errores
 
@@ -292,6 +310,11 @@ Los datos persisten entre reinicios del servidor. La base de datos comienza vac�
 | Correo duplicado | 400 | `{"detail": "El correo ya está registrado"}` |
 | PATCH sin ningún campo | 400 | `{"detail": "Debe enviar al menos un campo para actualizar"}` |
 | Rol no permitido o datos inválidos | 422 | Lista de errores de validación de Pydantic en `detail` |
+| Dispositivo o préstamo no encontrado | 404 | `{"detail": "Dispositivo no encontrado"}` o `{"detail": "Préstamo no encontrado"}` |
+| Número de serie duplicado | 400 | `{"detail": "El número de serie ya está registrado"}` |
+| Dispositivo no disponible | 409 | `{"detail": "El dispositivo no está disponible"}` |
+| Préstamo ya devuelto | 409 | `{"detail": "El préstamo ya fue devuelto"}` |
+| Eliminar un usuario o dispositivo con préstamos | 409 | `{"detail": "No se puede eliminar un usuario con préstamos registrados"}` (o dispositivo) |
 
 ## Dependency Injection con Depends()
 
@@ -333,6 +356,12 @@ La aplicación configura estos metadatos en `app/main.py`:
 Cada endpoint declara `summary`, `description` y `response_description`, por lo que la documentación explica qué hace, qué validaciones aplica y qué devuelve.
 
 Swagger/OpenAPI permite probar cada endpoint desde el navegador sin herramientas externas, y mantiene la documentación siempre sincronizada con el código.
+
+Además:
+
+- Los endpoints se agrupan por tags: `Users`, `Devices` y `Loans`.
+- Cada endpoint declara sus respuestas de error esperadas (400, 404 y 409, según el caso) con el schema `ErrorResponse`. El 422 de validación lo agrega FastAPI.
+- Los schemas de entrada y de respuesta incluyen ejemplos, que Swagger usa para precargar los cuerpos de las peticiones.
 
 ## Flujo de trabajo Git
 

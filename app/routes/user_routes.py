@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 
-from app.schemas.user_schema import User, UserRole
+from app.schemas.user_schema import User, UserCreate, UserRole
 
 router = APIRouter(prefix="/users")
 
@@ -50,3 +50,19 @@ def get_user(user_id: int) -> User:
             status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
         )
     return user
+
+
+@router.post("", response_model=User, status_code=status.HTTP_201_CREATED)
+def create_user(user_in: UserCreate) -> User:
+    email = user_in.email.lower()
+    if any(user.email.lower() == email for user in users_db):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El correo ya está registrado",
+        )
+
+    new_user = User(
+        id=max((user.id for user in users_db), default=0) + 1, **user_in.model_dump()
+    )
+    users_db.append(new_user)
+    return new_user

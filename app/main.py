@@ -1,5 +1,10 @@
 from fastapi import FastAPI
 
+from contextlib import asynccontextmanager
+
+from app.database.connection import engine
+from app.database.migration_check import ensure_database_is_migrated
+
 from app.routes.user_routes import router as user_router
 from app.routes.device_routes import router as device_router
 from app.routes.loan_routes import router as loan_router
@@ -19,6 +24,13 @@ tags_metadata = [
         "description": "Gestión de préstamos de dispositivos a usuarios.",
     },
 ]
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    ensure_database_is_migrated(engine)
+    yield
+
 
 app = FastAPI(
     title="device_systems API",

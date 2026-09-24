@@ -1,3 +1,4 @@
+from typing import Any
 from app.data.users_db import users_db
 from app.schemas.user_schema import User, UserCreate, UserRole
 
@@ -28,3 +29,9 @@ def create_user(user_in: UserCreate) -> User:
     )
     users_db.append(new_user)
     return new_user
+
+
+def update_user(user: User, changes: dict[str, Any]) -> User:
+    updated_user = user.model_copy(update=changes)
+    users_db[users_db.index(user)] = updated_user
+    return updated_user

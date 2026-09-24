@@ -270,3 +270,24 @@ Ventajas de este enfoque:
 - Las rutas quedan cortas y solo llaman al servicio.
 - FastAPI ejecuta cada dependencia una sola vez por petición, aunque varias la declaren.
 - Los errores (`HTTPException`) se lanzan desde las dependencias, por lo que todos los endpoints responden igual ante el mismo caso.
+
+## Documentación automática (Swagger/OpenAPI)
+
+FastAPI genera la documentación de la API a partir del código:
+
+| Interfaz | URL |
+|---|---|
+| Swagger UI | http://127.0.0.1:8000/docs |
+| ReDoc | http://127.0.0.1:8000/redoc |
+
+La aplicación configura estos metadatos en `app/main.py`:
+
+- **Título:** `device_systems API`
+- **Descripción:** API REST para la gestión de usuarios del sistema device_systems
+- **Versión:** `2.0.0`
+- **Contacto:** autor del proyecto
+- **Tags:** `Users` (con descripción)
+
+Cada endpoint declara `summary`, `description` y `response_description`, por lo que la documentación explica qué hace, qué validaciones aplica y qué devuelve.
+
+Swagger/OpenAPI permite probar cada endpoint desde el navegador sin herramientas externas, y mantiene la documentación siempre sincronizada con el código.

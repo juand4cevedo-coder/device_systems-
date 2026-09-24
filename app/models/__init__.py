@@ -1,1 +1,1 @@
-from app.models import user_model  # noqa: F401
+from app.models import device_model, loan_model, user_model  # noqa: F401

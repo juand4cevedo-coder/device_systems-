@@ -291,3 +291,25 @@ La aplicación configura estos metadatos en `app/main.py`:
 Cada endpoint declara `summary`, `description` y `response_description`, por lo que la documentación explica qué hace, qué validaciones aplica y qué devuelve.
 
 Swagger/OpenAPI permite probar cada endpoint desde el navegador sin herramientas externas, y mantiene la documentación siempre sincronizada con el código.
+
+## Base de datos (SQLAlchemy)
+
+La persistencia usa SQLAlchemy con SQLite. El archivo `device_systems.db` se crea automáticamente al iniciar la aplicación y no se versiona.
+
+| Componente | Archivo | Descripción |
+|---|---|---|
+| `engine` | `app/database/connection.py` | Conexión a `sqlite:///./device_systems.db` |
+| `SessionLocal` | `app/database/connection.py` | Fábrica de sesiones |
+| `Base` | `app/database/connection.py` | Base declarativa de los modelos |
+| `get_db` | `app/dependencies/database_dependency.py` | Dependencia que entrega una sesión por petición y la cierra al terminar |
+
+### Modelo `User` (tabla `users`)
+
+| Campo | Tipo | Restricción |
+|---|---|---|
+| `id` | Integer | Primary Key |
+| `name` | String | Obligatorio |
+| `email` | String | Único y obligatorio |
+| `role` | String | Obligatorio |
+| `is_active` | Boolean | Valor por defecto `True` |
+| `created_at` | DateTime | Fecha de creación (UTC) |

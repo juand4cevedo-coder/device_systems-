@@ -1,6 +1,13 @@
 from fastapi import APIRouter, HTTPException, Response, status
 
-from app.schemas.user_schema import User, UserCreate, UserResponse, UserRole
+from app.schemas.user_schema import (
+    User,
+    UserCreate,
+    UserPatch,
+    UserResponse,
+    UserRole,
+    UserUpdate,
+)
 from app.services import user_service
 
 router = APIRouter(prefix="/users")
@@ -42,3 +49,20 @@ def create_user(user_in: UserCreate, response: Response) -> User:
             detail="El correo ya está registrado",
         )
     return user_service.create_user(user_in)
+
+
+@router.put("/{user_id}", response_model=UserResponse)
+def update_user(user_id: int, user_in: UserUpdate, response: Response) -> User:
+    set_api_headers(response)
+    user = user_service.get_user_by_id(user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
+        )
+    existing_user = user_service.get_user_by_email(user_in.email)
+    if existing_user is not None and existing_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El correo ya está registrado",
+        )
+    return user_service.update_user(user, user_in.model_dump())

@@ -19,7 +19,13 @@ from app.schemas.user_schema import (
     UserRole,
     UserUpdate,
 )
-from app.services import user_service
+from app.models.loan_model import Loan
+from app.schemas.loan_schema import LoanDetailResponse
+from app.models.loan_model import Loan
+from app.schemas.loan_schema import LoanDetailResponse
+from app.services import loan_service, user_service
+from app.services.loan_service import LoanFilters
+from app.services.loan_service import LoanFilters
 
 router = APIRouter(
     prefix="/users", tags=["Users"], dependencies=[Depends(set_api_headers)]
@@ -113,3 +119,31 @@ def delete_user(
     user: User = Depends(get_user_or_404), db: Session = Depends(get_db)
 ) -> None:
     user_service.delete_user(db, user)
+
+
+@router.get(
+    "/{user_id}/loans",
+    response_model=list[LoanDetailResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Consultar los préstamos de un usuario",
+    description="Devuelve el historial de préstamos del usuario indicado, con los datos de cada dispositivo. Responde 404 si el usuario no existe.",
+    response_description="Préstamos del usuario",
+)
+def list_user_loans(
+    user: User = Depends(get_user_or_404), db: Session = Depends(get_db)
+) -> list[Loan]:
+    return loan_service.search_loans(db, LoanFilters(user_id=user.id))
+
+
+@router.get(
+    "/{user_id}/loans",
+    response_model=list[LoanDetailResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Consultar los préstamos de un usuario",
+    description="Devuelve el historial de préstamos del usuario indicado, con los datos de cada dispositivo. Responde 404 si el usuario no existe.",
+    response_description="Préstamos del usuario",
+)
+def list_user_loans(
+    user: User = Depends(get_user_or_404), db: Session = Depends(get_db)
+) -> list[Loan]:
+    return loan_service.search_loans(db, LoanFilters(user_id=user.id))

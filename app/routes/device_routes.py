@@ -14,7 +14,10 @@ from app.dependencies.device_dependencies import (
 from app.dependencies.user_dependencies import set_api_headers
 from app.models.device_model import Device
 from app.schemas.device_schema import DeviceCreate, DeviceResponse
-from app.services import device_service
+from app.models.loan_model import Loan
+from app.schemas.loan_schema import LoanDetailResponse
+from app.services import device_service, loan_service
+from app.services.loan_service import LoanFilters
 
 router = APIRouter(
     prefix="/devices", tags=["Devices"], dependencies=[Depends(set_api_headers)]
@@ -110,3 +113,17 @@ def delete_device(
     db: Session = Depends(get_db),
 ) -> None:
     device_service.delete_device(db, device)
+
+
+@router.get(
+    "/{device_id}/loans",
+    response_model=list[LoanDetailResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Consultar el historial de préstamos de un dispositivo",
+    description="Devuelve todos los préstamos históricos del dispositivo indicado, con los datos de cada usuario. Responde 404 si el dispositivo no existe.",
+    response_description="Historial de préstamos del dispositivo",
+)
+def list_device_loans(
+    device: Device = Depends(get_device_or_404), db: Session = Depends(get_db)
+) -> list[Loan]:
+    return loan_service.search_loans(db, LoanFilters(device_id=device.id))

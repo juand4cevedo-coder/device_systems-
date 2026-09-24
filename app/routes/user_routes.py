@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 
-from app.schemas.user_schema import User, UserCreate, UserRole
+from app.schemas.user_schema import User, UserCreate, UserResponse, UserRole
 
 router = APIRouter(prefix="/users")
 
@@ -30,10 +30,19 @@ users_db: list[User] = [
 ]
 
 
-@router.get("")
+def set_api_headers(response: Response) -> None:
+    """Agrega las cabeceras personalizadas de la API a la respuesta."""
+    response.headers["X-App-Name"] = "device_systems"
+    response.headers["X-API-Version"] = "1.0"
+
+
+@router.get("", response_model=list[UserResponse])
 def list_users(
-    role: UserRole | None = None, is_active: bool | None = None
+    response: Response,
+    role: UserRole | None = None,
+    is_active: bool | None = None,
 ) -> list[User]:
+    set_api_headers(response)
     users = users_db
     if role is not None:
         users = [user for user in users if user.role == role]
@@ -42,8 +51,9 @@ def list_users(
     return users
 
 
-@router.get("/{user_id}")
-def get_user(user_id: int) -> User:
+@router.get("/{user_id}", response_model=UserResponse)
+def get_user(user_id: int, response: Response) -> User:
+    set_api_headers(response)
     user = next((user for user in users_db if user.id == user_id), None)
     if user is None:
         raise HTTPException(
@@ -52,8 +62,9 @@ def get_user(user_id: int) -> User:
     return user
 
 
-@router.post("", response_model=User, status_code=status.HTTP_201_CREATED)
-def create_user(user_in: UserCreate) -> User:
+@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def create_user(user_in: UserCreate, response: Response) -> User:
+    set_api_headers(response)
     email = user_in.email.lower()
     if any(user.email.lower() == email for user in users_db):
         raise HTTPException(

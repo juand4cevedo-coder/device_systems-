@@ -28,3 +28,9 @@ class User(UserBase):
     """Usuario completo, con su identificador."""
 
     id: int
+
+
+class UserResponse(UserBase):
+    """Modelo público de respuesta: lo que la API expone al cliente."""
+
+    id: int

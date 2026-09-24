@@ -87,3 +87,14 @@ Respuesta `201 Created`:
 |---|---|
 | 400 Bad Request | El correo ya está registrado |
 | 422 Unprocessable Entity | Datos inválidos (nombre corto, email mal formado, rol no permitido) |
+
+## Response models y cabeceras HTTP
+
+Todos los endpoints declaran un `response_model` (`UserResponse`), que define los campos que la API expone: `id`, `name`, `email`, `role` e `is_active`.
+
+Las respuestas exitosas incluyen estas cabeceras personalizadas:
+
+| Cabecera | Valor |
+|---|---|
+| `X-App-Name` | `device_systems` |
+| `X-API-Version` | `1.0` |

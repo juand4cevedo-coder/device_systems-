@@ -19,6 +19,7 @@ _ERROR_DESCRIPTIONS = {
     403: "El usuario autenticado no tiene permisos para esta operación",
     404: "Recurso no encontrado",
     409: "Conflicto con una regla de negocio",
+    429: "Se superó el límite de solicitudes permitido",
 }
 
 

@@ -15,6 +15,7 @@ class ErrorResponse(BaseModel):
 
 _ERROR_DESCRIPTIONS = {
     400: "Solicitud inválida: dato duplicado o cuerpo sin campos",
+    401: "Credenciales inválidas o token ausente",
     404: "Recurso no encontrado",
     409: "Conflicto con una regla de negocio",
 }

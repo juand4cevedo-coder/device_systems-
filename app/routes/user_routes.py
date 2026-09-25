@@ -1,12 +1,9 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 
-from fastapi import Request
-
 from app.core_limiter import limiter
-
 from app.dependencies.auth_dependency import (
     get_current_active_user,
     require_admin,
@@ -41,9 +38,10 @@ router = APIRouter(prefix="/users", tags=["Users"])
     "",
     response_model=list[UserResponse],
     status_code=status.HTTP_200_OK,
+    responses=error_responses(401),
     dependencies=[Depends(get_current_active_user)],
     summary="Listar usuarios",
-    description="Devuelve todos los usuarios. Se puede filtrar por rol (`role`) y por estado (`is_active`), combinando ambos filtros, y ordenar por nombre (`name`) o por fecha de creación (`created_at`, el valor por defecto). Límite: 30 solicitudes por minuto.",
+    description="Devuelve todos los usuarios. Se puede filtrar por rol (`role`) y por estado (`is_active`), combinando ambos filtros, y ordenar por nombre (`name`) o por fecha de creación (`created_at`, el valor por defecto). Requiere estar autenticado. Límite: 30 solicitudes por minuto.",
     response_description="Lista de usuarios que cumplen los filtros",
 )
 @limiter.limit("30/minute")
@@ -61,10 +59,10 @@ def list_users(
     "/{user_id}",
     response_model=UserResponse,
     status_code=status.HTTP_200_OK,
-    responses=error_responses(404),
+    responses=error_responses(401, 404),
     dependencies=[Depends(get_current_active_user)],
     summary="Consultar un usuario",
-    description="Devuelve el usuario que corresponde al ID indicado en la ruta. Responde 404 si no existe.",
+    description="Devuelve el usuario que corresponde al ID indicado en la ruta. Requiere estar autenticado. Responde 404 si no existe.",
     response_description="Datos del usuario solicitado",
 )
 def get_user(user: User = Depends(get_user_or_404)) -> User:
@@ -75,10 +73,10 @@ def get_user(user: User = Depends(get_user_or_404)) -> User:
     "",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
-    responses=error_responses(400),
+    responses=error_responses(400, 401, 403),
     dependencies=[Depends(require_admin)],
     summary="Crear un usuario",
-    description="Registra un nuevo usuario. Valida el nombre (mínimo 3 caracteres), el formato del correo, el rol y la fortaleza de la contraseña. Responde 400 si el correo ya está registrado.",
+    description="Registra un nuevo usuario. Valida el nombre (mínimo 3 caracteres), el formato del correo, el rol y la fortaleza de la contraseña. Requiere rol admin. Responde 400 si el correo ya está registrado.",
     response_description="Usuario creado",
 )
 def create_user(
@@ -92,10 +90,10 @@ def create_user(
     "/{user_id}",
     response_model=UserResponse,
     status_code=status.HTTP_200_OK,
-    responses=error_responses(400, 404),
+    responses=error_responses(400, 401, 403, 404),
     dependencies=[Depends(require_staff)],
     summary="Reemplazar un usuario",
-    description="Reemplaza por completo los datos de un usuario existente; deben enviarse todos los campos. Responde 404 si no existe y 400 si el correo pertenece a otro usuario.",
+    description="Reemplaza por completo los datos de un usuario existente; deben enviarse todos los campos. Requiere rol admin o support. Responde 404 si no existe y 400 si el correo pertenece a otro usuario.",
     response_description="Usuario con los datos reemplazados",
 )
 def update_user(
@@ -110,10 +108,10 @@ def update_user(
     "/{user_id}",
     response_model=UserResponse,
     status_code=status.HTTP_200_OK,
-    responses=error_responses(400, 404),
+    responses=error_responses(400, 401, 403, 404),
     dependencies=[Depends(require_staff)],
     summary="Actualizar parcialmente un usuario",
-    description="Modifica solo los campos enviados. Responde 400 si el cuerpo no trae ningún campo o si el correo pertenece a otro usuario, y 404 si el usuario no existe.",
+    description="Modifica solo los campos enviados. Requiere rol admin o support. Responde 400 si el cuerpo no trae ningún campo o si el correo pertenece a otro usuario, y 404 si el usuario no existe.",
     response_description="Usuario con los cambios aplicados",
 )
 def patch_user(
@@ -127,10 +125,10 @@ def patch_user(
 @router.delete(
     "/{user_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    responses=error_responses(404, 409),
+    responses=error_responses(401, 403, 404, 409),
     dependencies=[Depends(require_admin)],
     summary="Eliminar un usuario",
-    description="Elimina el usuario indicado. Responde 404 si no existe y 409 si tiene préstamos registrados.",
+    description="Elimina el usuario indicado. Requiere rol admin. Responde 404 si no existe y 409 si tiene préstamos registrados.",
     response_description="Usuario eliminado; la respuesta no tiene cuerpo",
 )
 def delete_user(
@@ -143,10 +141,10 @@ def delete_user(
     "/{user_id}/loans",
     response_model=list[LoanDetailResponse],
     status_code=status.HTTP_200_OK,
-    responses=error_responses(404),
+    responses=error_responses(401, 403, 404),
     dependencies=[Depends(require_staff)],
     summary="Consultar los préstamos de un usuario",
-    description="Devuelve el historial de préstamos del usuario indicado, con los datos de cada dispositivo. Responde 404 si el usuario no existe.",
+    description="Devuelve el historial de préstamos del usuario indicado, con los datos de cada dispositivo. Requiere rol admin o support. Responde 404 si el usuario no existe.",
     response_description="Préstamos del usuario",
 )
 def list_user_loans(

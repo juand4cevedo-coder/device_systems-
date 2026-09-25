@@ -48,3 +48,31 @@ def validate_new_registration(
             detail="El correo ya está registrado",
         )
     return user_in
+
+
+def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
+    """Exige que el usuario autenticado esté activo."""
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Usuario inactivo"
+        )
+    return current_user
+
+
+def require_roles(*roles: str):
+    """Crea una dependencia que exige uno de los roles indicados. Lanza 403 si no lo tiene."""
+    allowed_roles = set(roles)
+
+    def dependency(current_user: User = Depends(get_current_active_user)) -> User:
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tiene permisos para realizar esta operación",
+            )
+        return current_user
+
+    return dependency
+
+
+require_admin = require_roles("admin")
+require_staff = require_roles("admin", "support")

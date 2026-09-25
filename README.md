@@ -378,6 +378,25 @@ Con `allow_credentials=True`, `allow_methods=["*"]` y `allow_headers=["*"]`. En 
 
 También registra en consola el método, la ruta, el código de estado, el tiempo de respuesta y el `X-Request-ID` de cada petición.
 
+## Rate limiting
+
+La API limita el número de solicitudes por minuto en los endpoints más sensibles, usando `slowapi` con la IP del cliente como clave (`get_remote_address`). Al superar el límite, responde `429 Too Many Requests` con el mismo formato de error del resto de la API.
+
+| Endpoint | Límite |
+|---|---|
+| `POST /auth/login` | 5 por minuto |
+| `POST /auth/register` | 3 por minuto |
+| `GET /users` | 30 por minuto |
+| `POST /loans` | 10 por minuto |
+
+Respuesta `429 Too Many Requests`:
+
+```json
+{"detail": "Demasiadas solicitudes. Intenta de nuevo más tarde."}
+```
+
+La instancia compartida del limiter vive en `app/core_limiter.py`, separada de `app/main.py` para evitar un import circular con los routers que la usan.
+
 ### Ejemplos de peticiones
 
 ```bash
@@ -652,6 +671,7 @@ Los servicios reciben la sesión de base de datos y ejecutan las consultas con S
 | Datos inválidos (formato, rol, contraseña débil, filtros) | 422 | Lista de errores de validación de Pydantic en `detail` |
 | Credenciales incorrectas o token inválido | 401 | `{"detail": "Correo o contraseña incorrectos"}` o `{"detail": "No se pudo validar las credenciales"}` |
 | Usuario sin permisos | 403 | `{"detail": "No tiene permisos para realizar esta operación"}` |
+| Límite de solicitudes superado | 429 | `{"detail": "Demasiadas solicitudes. Intenta de nuevo más tarde."}` |
 
 ## Dependency Injection con Depends()
 
@@ -962,3 +982,11 @@ En EV07 la API solo permitía consultar y crear usuarios, con todo el código en
 ## Reflexión sobre FastAPI (EV07)
 
 FastAPI permitió construir la API de `users` con poco código: los path y query parameters se declaran como argumentos de las funciones, Pydantic valida los datos de entrada y los `response_model` controlan lo que la API devuelve, todo apoyado en los tipos de Python. Además, la documentación interactiva se genera automáticamente y sirvió para probar cada endpoint sin herramientas externas. [Completa con lo que más te sirvió o te costó aprender.]
+
+## Evidencias de pruebas (EV11) — rate limiting
+
+![Activación del límite de peticiones](docs/images/ev11/01-rate-limit-429.png)
+*Peticiones repetidas a `POST /auth/login`: las primeras cinco responden 401, la sexta en adelante responde 429.*
+
+![Cabeceras y cuerpo del 429](docs/images/ev11/02-rate-limit-headers.png)
+*Respuesta `429 Too Many Requests`, con el cuerpo `{"detail": "..."}` y las cabeceras del middleware.*

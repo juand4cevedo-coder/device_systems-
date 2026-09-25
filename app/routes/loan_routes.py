@@ -9,7 +9,6 @@ from app.dependencies.loan_dependencies import (
     get_loan_or_404,
     validate_new_loan,
 )
-from app.dependencies.user_dependencies import set_api_headers
 from app.models.device_model import Device
 from app.models.loan_model import Loan
 from app.models.user_model import User
@@ -18,9 +17,7 @@ from app.schemas.loan_schema import LoanDetailResponse, LoanResponse
 from app.services import loan_service
 from app.services.loan_service import LoanFilters
 
-router = APIRouter(
-    prefix="/loans", tags=["Loans"], dependencies=[Depends(set_api_headers)]
-)
+router = APIRouter(prefix="/loans", tags=["Loans"])
 
 
 @router.get(

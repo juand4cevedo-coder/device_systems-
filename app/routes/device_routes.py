@@ -16,7 +16,6 @@ from app.dependencies.device_dependencies import (
     validate_device_replacement,
     validate_new_device,
 )
-from app.dependencies.user_dependencies import set_api_headers
 from app.models.device_model import Device
 from app.models.loan_model import Loan
 from app.schemas.device_schema import DeviceCreate, DeviceResponse
@@ -25,9 +24,7 @@ from app.schemas.loan_schema import LoanDetailResponse
 from app.services import device_service, loan_service
 from app.services.loan_service import LoanFilters
 
-router = APIRouter(
-    prefix="/devices", tags=["Devices"], dependencies=[Depends(set_api_headers)]
-)
+router = APIRouter(prefix="/devices", tags=["Devices"])
 
 
 @router.get(

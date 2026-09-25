@@ -12,7 +12,6 @@ from app.dependencies.database_dependency import get_db
 from app.dependencies.user_dependencies import (
     ensure_user_can_be_deleted,
     get_user_or_404,
-    set_api_headers,
     validate_new_user,
     validate_user_changes,
     validate_user_replacement,
@@ -31,9 +30,7 @@ from app.schemas.user_schema import (
 from app.services import loan_service, user_service
 from app.services.loan_service import LoanFilters
 
-router = APIRouter(
-    prefix="/users", tags=["Users"], dependencies=[Depends(set_api_headers)]
-)
+router = APIRouter(prefix="/users", tags=["Users"])
 
 
 @router.get(

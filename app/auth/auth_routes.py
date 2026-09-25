@@ -8,16 +8,13 @@ from app.auth.auth_service import authenticate_user
 from app.auth.security import create_access_token
 from app.dependencies.auth_dependency import get_current_user, validate_new_registration
 from app.dependencies.database_dependency import get_db
-from app.dependencies.user_dependencies import set_api_headers
 from app.models.user_model import User
 from app.schemas.auth_schema import Token, UserRegister
 from app.schemas.error_schema import error_responses
 from app.schemas.user_schema import UserCreate, UserResponse
 from app.services import user_service
 
-router = APIRouter(
-    prefix="/auth", tags=["Auth"], dependencies=[Depends(set_api_headers)]
-)
+router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 @router.post(

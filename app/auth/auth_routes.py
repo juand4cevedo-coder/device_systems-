@@ -1,11 +1,10 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from fastapi import APIRouter, Depends, HTTPException, status
-
 from app.auth.auth_service import authenticate_user
 from app.auth.security import create_access_token
+from app.core_limiter import limiter
 from app.dependencies.auth_dependency import get_current_user, validate_new_registration
 from app.dependencies.database_dependency import get_db
 from app.models.user_model import User
@@ -23,10 +22,12 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
     status_code=status.HTTP_201_CREATED,
     responses=error_responses(400),
     summary="Registrar un usuario",
-    description="Crea una cuenta con contraseña segura. Valida el nombre, el formato del correo, que no esté registrado, la fortaleza de la contraseña y el rol. Responde 400 si el correo ya existe.",
+    description="Crea una cuenta con contraseña segura. Valida el nombre, el formato del correo, que no esté registrado, la fortaleza de la contraseña y el rol. Responde 400 si el correo ya existe. Límite: 3 solicitudes por minuto.",
     response_description="Usuario registrado",
 )
+@limiter.limit("3/minute")
 def register(
+    request: Request,
     user_in: UserRegister = Depends(validate_new_registration),
     db: Session = Depends(get_db),
 ) -> User:
@@ -44,11 +45,14 @@ def register(
     response_model=Token,
     responses=error_responses(401),
     summary="Iniciar sesión",
-    description="Autentica al usuario y devuelve un token JWT. Recibe las credenciales como formulario OAuth2 (`username` = correo, `password`), no como JSON.",
+    description="Autentica al usuario y devuelve un token JWT. Recibe las credenciales como formulario OAuth2 (`username` = correo, `password`), no como JSON. Límite: 5 solicitudes por minuto.",
     response_description="Token de acceso",
 )
+@limiter.limit("5/minute")
 def login(
-    form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
 ) -> Token:
     user = authenticate_user(db, form_data.username, form_data.password)
     if user is None:

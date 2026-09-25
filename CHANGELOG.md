@@ -70,3 +70,26 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - Eliminar un usuario o un dispositivo con préstamos registrados responde `409 Conflict`.
 - Cabecera `X-API-Version` actualizada a `2.2`.
 - README reorganizado en un orden de lectura más claro.
+
+## [3.0.0] - AAAA-MM-DD
+
+### Added
+- Autenticación con OAuth2 y JWT: `POST /auth/register`, `POST /auth/login`, `GET /auth/me` (EV11).
+- Hash de contraseñas con `passlib` (bcrypt) y campo `hashed_password` en `User`, nunca expuesto en las respuestas.
+- Validación de contraseñas: mínimo 8 caracteres, mayúscula, minúscula y número.
+- Protección de rutas por autenticación y por rol (`admin`, `support`), con las dependencias `get_current_user`, `get_current_active_user`, `require_admin` y `require_staff`.
+- CORS configurado para clientes de desarrollo local.
+- Middleware personalizado (`RequestContextMiddleware`) con cabeceras `X-App-Name`, `X-API-Version`, `X-Process-Time` y `X-Request-ID`, y logging de cada petición.
+- Rate limiting con `slowapi`: `POST /auth/login` (5/min), `POST /auth/register` (3/min), `GET /users` (30/min), `POST /loans` (10/min), con respuesta 429 uniforme.
+- Migración de Alembic para los campos de autenticación en `users`, compatible con datos existentes.
+- Evidencias de pruebas y reflexión de EV11 en el README.
+
+### Changed
+- Cabeceras personalizadas (`X-App-Name`, `X-API-Version`) migradas de una dependencia por router al middleware, aplicándose también a respuestas de error.
+- Cabecera `X-API-Version` actualizada a `3.0`.
+- `POST /users` ahora exige contraseña y rol admin; `POST /auth/register` es el registro público.
+- README reorganizado con las secciones de seguridad.
+
+### Fixed
+- Error 500 en el manejo de `RateLimitExceeded` por falta de import de `status`.
+- Import circular entre `app.main` y `app.auth.auth_routes`, resuelto con `app/core_limiter.py`.

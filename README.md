@@ -321,6 +321,37 @@ Ejemplo de `LoanDetailResponse`:
 | POST | `/auth/login` | Autentica y devuelve un token JWT | Formulario OAuth2: `username` (correo), `password` |
 | GET | `/auth/me` | Devuelve el usuario autenticado | `Authorization: Bearer <token>` |
 
+## Protección de rutas
+
+Las rutas requieren un token JWT válido (`Authorization: Bearer <token>`), salvo `POST /auth/register` y `POST /auth/login`, que son públicas. Sin token o con uno inválido, la API responde `401 Unauthorized`; si el usuario no tiene el rol necesario, responde `403 Forbidden`.
+
+| Ruta | Protección |
+|---|---|
+| `GET /users`, `GET /users/{user_id}` | Usuario autenticado |
+| `POST /users` | Admin |
+| `PUT /users/{user_id}`, `PATCH /users/{user_id}` | Admin o support |
+| `DELETE /users/{user_id}` | Admin |
+| `GET /users/{user_id}/loans` | Admin o support |
+| `GET /devices`, `GET /devices/{device_id}` | Usuario autenticado |
+| `POST /devices`, `PUT /devices/{device_id}`, `PATCH /devices/{device_id}` | Admin o support |
+| `DELETE /devices/{device_id}` | Admin |
+| `GET /devices/{device_id}/loans` | Admin o support |
+| `POST /loans`, `GET /loans/{loan_id}` | Usuario autenticado |
+| `GET /loans`, `GET /loans/details` | Admin o support |
+| `PATCH /loans/{loan_id}/return` | Admin o support |
+
+`GET /users` y `GET /devices` solo exigen estar autenticado, según la tabla de la guía. El resto de las rutas no listadas explícitamente por la guía se protegió con el mismo criterio que su equivalente: `POST /users` queda para admin porque el registro público ya lo cubre `/auth/register`; el resto de operaciones de escritura sobre usuarios y dispositivos sigue el mismo nivel que su operación equivalente ya listada, y las consultas que exponen el historial completo de préstamos (`GET /loans`, `/loans/details`, `/users/{id}/loans`, `/devices/{id}/loans`) quedan para admin o support.
+
+Las dependencias que aplican estas reglas están en `app/dependencies/auth_dependency.py`:
+
+| Dependencia | Qué exige |
+|---|---|
+| `get_current_user` | Un token JWT válido |
+| `get_current_active_user` | Un token válido y que el usuario esté activo (400 si no) |
+| `require_roles(*roles)` | Uno de los roles indicados (403 si no) |
+| `require_admin` | Rol `admin` |
+| `require_staff` | Rol `admin` o `support` |
+
 ### Ejemplos de peticiones
 
 ```bash
@@ -594,6 +625,7 @@ Los servicios reciben la sesión de base de datos y ejecutan las consultas con S
 | Eliminar un usuario o dispositivo con préstamos | 409 | `{"detail": "No se puede eliminar un usuario con préstamos registrados"}` (o dispositivo) |
 | Datos inválidos (formato, rol, contraseña débil, filtros) | 422 | Lista de errores de validación de Pydantic en `detail` |
 | Credenciales incorrectas o token inválido | 401 | `{"detail": "Correo o contraseña incorrectos"}` o `{"detail": "No se pudo validar las credenciales"}` |
+| Usuario sin permisos | 403 | `{"detail": "No tiene permisos para realizar esta operación"}` |
 
 ## Dependency Injection con Depends()
 

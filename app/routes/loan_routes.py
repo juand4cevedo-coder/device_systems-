@@ -1,6 +1,10 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
+from fastapi import Request
+
+from app.core_limiter import limiter
+
 from app.dependencies.auth_dependency import get_current_active_user, require_staff
 from app.dependencies.database_dependency import get_db
 from app.dependencies.loan_dependencies import (
@@ -74,10 +78,12 @@ def get_loan(loan: Loan = Depends(get_loan_or_404)) -> Loan:
     responses=error_responses(404, 409),
     dependencies=[Depends(get_current_active_user)],
     summary="Registrar un préstamo",
-    description="Presta un dispositivo a un usuario y lo marca como no disponible. Responde 404 si el usuario o el dispositivo no existen y 409 si el dispositivo no está disponible.",
+    description="Presta un dispositivo a un usuario y lo marca como no disponible. Responde 404 si el usuario o el dispositivo no existen y 409 si el dispositivo no está disponible. Límite: 10 solicitudes por minuto.",
     response_description="Préstamo registrado",
 )
+@limiter.limit("10/minute")
 def create_loan(
+    request: Request,
     user_and_device: tuple[User, Device] = Depends(validate_new_loan),
     db: Session = Depends(get_db),
 ) -> Loan:

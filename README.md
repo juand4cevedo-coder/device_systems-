@@ -352,6 +352,32 @@ Las dependencias que aplican estas reglas están en `app/dependencies/auth_depen
 | `require_admin` | Rol `admin` |
 | `require_staff` | Rol `admin` o `support` |
 
+
+## CORS y middleware
+
+### CORS
+
+La API permite peticiones desde clientes de desarrollo local:
+
+```python
+allow_origins=["http://localhost:5173", "http://localhost:3000"]
+```
+
+Con `allow_credentials=True`, `allow_methods=["*"]` y `allow_headers=["*"]`. En producción no se recomienda usar `"*"` en los métodos ni en las cabeceras junto con `allow_credentials=True`, porque eso permitiría a cualquier origen enviar peticiones autenticadas.
+
+### Middleware personalizado
+
+`app/middlewares/request_middleware.py` agrega a **toda** respuesta, incluidas las de error:
+
+| Cabecera | Contenido |
+|---|---|
+| `X-App-Name` | `device_systems` |
+| `X-API-Version` | `2.2` |
+| `X-Process-Time` | Tiempo de procesamiento de la petición, en segundos |
+| `X-Request-ID` | Identificador de la petición; se reutiliza si el cliente lo envía, o se genera uno nuevo |
+
+También registra en consola el método, la ruta, el código de estado, el tiempo de respuesta y el `X-Request-ID` de cada petición.
+
 ### Ejemplos de peticiones
 
 ```bash

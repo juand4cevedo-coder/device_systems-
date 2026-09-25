@@ -33,7 +33,7 @@ tags_metadata = [
     },
     {
         "name": "Auth",
-        "description": "Registro, autenticación y perfil del usuario autenticado.",
+        "description": "Registro, autenticación, perfil del usuario autenticado y seguridad: hash de contraseñas, tokens JWT y control de acceso por rol.",
     },
 ]
 

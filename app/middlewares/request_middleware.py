@@ -17,7 +17,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
 
         process_time = time.perf_counter() - start_time
         response.headers["X-App-Name"] = "device_systems"
-        response.headers["X-API-Version"] = "2.2"
+        response.headers["X-API-Version"] = "3.0"
         response.headers["X-Process-Time"] = f"{process_time:.4f}"
         response.headers["X-Request-ID"] = request_id
 

@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from app.auth.auth_routes import router as auth_router
 
 from contextlib import asynccontextmanager
 
@@ -23,6 +24,10 @@ tags_metadata = [
         "name": "Loans",
         "description": "Gestión de préstamos de dispositivos a usuarios.",
     },
+    {
+        "name": "Auth",
+        "description": "Registro, autenticación y perfil del usuario autenticado.",
+    },
 ]
 
 
@@ -43,6 +48,7 @@ app = FastAPI(
     openapi_tags=tags_metadata,
 )
 
+app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(device_router)
 app.include_router(loan_router)

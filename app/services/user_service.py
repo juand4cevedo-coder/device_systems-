@@ -1,4 +1,5 @@
 from typing import Any
+from app.auth.security import get_password_hash
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -33,7 +34,8 @@ def get_user_by_email(db: Session, email: str) -> User | None:
 
 
 def create_user(db: Session, user_in: UserCreate) -> User:
-    user = User(**user_in.model_dump())
+    user_data = user_in.model_dump(exclude={"password"})
+    user = User(hashed_password=get_password_hash(user_in.password), **user_data)
     db.add(user)
     db.commit()
     db.refresh(user)

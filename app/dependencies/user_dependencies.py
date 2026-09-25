@@ -1,18 +1,12 @@
 from typing import Any
 
-from fastapi import Depends, HTTPException, Response, status
+from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.dependencies.database_dependency import get_db
 from app.models.user_model import User
 from app.schemas.user_schema import UserCreate, UserPatch, UserUpdate
 from app.services import user_service
-
-
-def set_api_headers(response: Response) -> None:
-    """Agrega las cabeceras personalizadas de la API a cada respuesta."""
-    response.headers["X-App-Name"] = "device_systems"
-    response.headers["X-API-Version"] = "2.2"
 
 
 def get_user_or_404(user_id: int, db: Session = Depends(get_db)) -> User:

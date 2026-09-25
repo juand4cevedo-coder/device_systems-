@@ -352,86 +352,6 @@ Las dependencias que aplican estas reglas están en `app/dependencies/auth_depen
 | `require_admin` | Rol `admin` |
 | `require_staff` | Rol `admin` o `support` |
 
-
-## CORS y middleware
-
-### CORS
-
-La API permite peticiones desde clientes de desarrollo local:
-
-```python
-allow_origins=["http://localhost:5173", "http://localhost:3000"]
-```
-
-Con `allow_credentials=True`, `allow_methods=["*"]` y `allow_headers=["*"]`. En producción no se recomienda usar `"*"` en los métodos ni en las cabeceras junto con `allow_credentials=True`, porque eso permitiría a cualquier origen enviar peticiones autenticadas.
-
-### Middleware personalizado
-
-`app/middlewares/request_middleware.py` agrega a **toda** respuesta, incluidas las de error:
-
-| Cabecera | Contenido |
-|---|---|
-| `X-App-Name` | `device_systems` |
-| `X-API-Version` | `2.2` |
-| `X-Process-Time` | Tiempo de procesamiento de la petición, en segundos |
-| `X-Request-ID` | Identificador de la petición; se reutiliza si el cliente lo envía, o se genera uno nuevo |
-
-También registra en consola el método, la ruta, el código de estado, el tiempo de respuesta y el `X-Request-ID` de cada petición.
-
-## Rate limiting
-
-La API limita el número de solicitudes por minuto en los endpoints más sensibles, usando `slowapi` con la IP del cliente como clave (`get_remote_address`). Al superar el límite, responde `429 Too Many Requests` con el mismo formato de error del resto de la API.
-
-| Endpoint | Límite |
-|---|---|
-| `POST /auth/login` | 5 por minuto |
-| `POST /auth/register` | 3 por minuto |
-| `GET /users` | 30 por minuto |
-| `POST /loans` | 10 por minuto |
-
-Respuesta `429 Too Many Requests`:
-
-```json
-{"detail": "Demasiadas solicitudes. Intenta de nuevo más tarde."}
-```
-
-La instancia compartida del limiter vive en `app/core_limiter.py`, separada de `app/main.py` para evitar un import circular con los routers que la usan.
-
-### Ejemplos de peticiones
-
-```bash
-curl -X POST http://127.0.0.1:8000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Ana Pérez", "email": "ana@sena.edu.co", "password": "Abcdef12", "role": "admin"}'
-
-curl -X POST http://127.0.0.1:8000/auth/login \
-  -d "username=ana@sena.edu.co" \
-  -d "password=Abcdef12"
-
-curl http://127.0.0.1:8000/auth/me \
-  -H "Authorization: Bearer <token>"
-```
-
-Respuesta `200 OK` de `POST /auth/login`:
-
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer"
-}
-```
-
-### Respuestas de error
-
-| Código | Caso |
-|---|---|
-| 400 Bad Request | El correo ya está registrado |
-| 401 Unauthorized | Correo o contraseña incorrectos, o token ausente / inválido |
-| 422 Unprocessable Entity | Datos inválidos (nombre corto, correo mal formado, contraseña débil) |
-
-`POST /auth/register` es hoy la única forma de crear un usuario con rol `admin`, ya que `POST /users` se protegerá para administradores en el siguiente bloque.
-
-
 ## Endpoints
 
 | Método | Ruta | Descripción | Parámetros |
@@ -643,6 +563,84 @@ Los servicios reciben la sesión de base de datos y ejecutan las consultas con S
 | Registrar y devolver préstamos | `loan_service.create_loan`, `loan_service.return_loan` |
 | Consultar préstamos con joins y filtros | `loan_service.search_loans` |
 
+## CORS y middleware
+
+### CORS
+
+La API permite peticiones desde clientes de desarrollo local:
+
+```python
+allow_origins=["http://localhost:5173", "http://localhost:3000"]
+```
+
+Con `allow_credentials=True`, `allow_methods=["*"]` y `allow_headers=["*"]`. En producción no se recomienda usar `"*"` en los métodos ni en las cabeceras junto con `allow_credentials=True`, porque eso permitiría a cualquier origen enviar peticiones autenticadas.
+
+### Middleware personalizado
+
+`app/middlewares/request_middleware.py` agrega a **toda** respuesta, incluidas las de error:
+
+| Cabecera | Contenido |
+|---|---|
+| `X-App-Name` | `device_systems` |
+| `X-API-Version` | `2.2` |
+| `X-Process-Time` | Tiempo de procesamiento de la petición, en segundos |
+| `X-Request-ID` | Identificador de la petición; se reutiliza si el cliente lo envía, o se genera uno nuevo |
+
+También registra en consola el método, la ruta, el código de estado, el tiempo de respuesta y el `X-Request-ID` de cada petición.
+
+## Rate limiting
+
+La API limita el número de solicitudes por minuto en los endpoints más sensibles, usando `slowapi` con la IP del cliente como clave (`get_remote_address`). Al superar el límite, responde `429 Too Many Requests` con el mismo formato de error del resto de la API.
+
+| Endpoint | Límite |
+|---|---|
+| `POST /auth/login` | 5 por minuto |
+| `POST /auth/register` | 3 por minuto |
+| `GET /users` | 30 por minuto |
+| `POST /loans` | 10 por minuto |
+
+Respuesta `429 Too Many Requests`:
+
+```json
+{"detail": "Demasiadas solicitudes. Intenta de nuevo más tarde."}
+```
+
+La instancia compartida del limiter vive en `app/core_limiter.py`, separada de `app/main.py` para evitar un import circular con los routers que la usan.
+
+### Ejemplos de peticiones
+
+```bash
+curl -X POST http://127.0.0.1:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Ana Pérez", "email": "ana@sena.edu.co", "password": "Abcdef12", "role": "admin"}'
+
+curl -X POST http://127.0.0.1:8000/auth/login \
+  -d "username=ana@sena.edu.co" \
+  -d "password=Abcdef12"
+
+curl http://127.0.0.1:8000/auth/me \
+  -H "Authorization: Bearer <token>"
+```
+
+Respuesta `200 OK` de `POST /auth/login`:
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
+
+### Respuestas de error
+
+| Código | Caso |
+|---|---|
+| 400 Bad Request | El correo ya está registrado |
+| 401 Unauthorized | Correo o contraseña incorrectos, o token ausente / inválido |
+| 422 Unprocessable Entity | Datos inválidos (nombre corto, correo mal formado, contraseña débil) |
+
+`POST /auth/register` es hoy la única forma de crear un usuario con rol `admin`, ya que `POST /users` se protegerá para administradores en el siguiente bloque.
+
 ## Códigos de estado usados
 
 | Operación | Método y ruta | Código |
@@ -726,6 +724,73 @@ El proyecto sigue GitFlow:
 Los commits siguen Conventional Commits: `tipo(scope): descripción` (por ejemplo, `feat(users): add POST /users`).
 
 El trabajo de EV10 se desarrolló en la rama `device_systems_alembic_relaciones`, que se integró a `develop` y llegó a `main` con el release `2.2.0`. El de EV11 se desarrolla en `device_systems_security` y llegará a `main` con el release `3.0.0`.
+
+## Evidencias de pruebas (EV11)
+
+### Alembic, Swagger y ReDoc
+
+![Migración de autenticación aplicada](docs/images/ev11/01-alembic-migration-applied.png)
+*Migración `add authentication fields to users` aplicada con `alembic upgrade head`.*
+
+![Swagger UI: vista general](docs/images/ev11/02-swagger-overview.png)
+*Título, versión 3.0.0 y candados en los endpoints protegidos.*
+
+![Swagger UI: schemas de autenticación](docs/images/ev11/03-swagger-schemas.png)
+*Schemas `UserRegister`, `Token` y `ErrorResponse`.*
+
+![ReDoc](docs/images/ev11/04-redoc-overview.png)
+*Documentación en `/redoc`.*
+
+### Pruebas funcionales mínimas
+
+![Test 1](docs/images/ev11/05-test01-register-user.png)
+*1. Registro de usuario: 201 Created.*
+
+![Test 2](docs/images/ev11/06-test02-register-weak-password.png)
+*2. Registro con contraseña débil: 422 Unprocessable Entity.*
+
+![Test 3](docs/images/ev11/07-test03-register-duplicate-email.png)
+*3. Registro con email duplicado: 400 Bad Request.*
+
+![Test 4](docs/images/ev11/08-test04-login-success.png)
+*4. Login correcto: 200 OK con el token JWT.*
+
+![Test 5](docs/images/ev11/09-test05-login-wrong-password.png)
+*5. Login con contraseña incorrecta: 401 Unauthorized.*
+
+![Test 6](docs/images/ev11/10-test06-auth-me.png)
+*6. Consulta de `/auth/me`: 200 OK, sin `hashed_password`.*
+
+![Test 7](docs/images/ev11/11-test07-protected-route-no-token.png)
+*7. Acceso a ruta protegida sin token: 401 Unauthorized.*
+
+![Test 8](docs/images/ev11/12-test08-protected-route-invalid-token.png)
+*8. Acceso con token inválido: 401 Unauthorized.*
+
+![Test 9](docs/images/ev11/13-test09-forbidden-insufficient-role.png)
+*9. Acceso con usuario sin permisos: 403 Forbidden.*
+
+![Test 10](docs/images/ev11/14-test10-create-device-allowed-role.png)
+*10. Creación de dispositivo con rol permitido: 201 Created.*
+
+![Test 11](docs/images/ev11/15-test11-delete-device-forbidden-role.png)
+*11. Eliminación de dispositivo con rol no permitido: 403 Forbidden.*
+
+### CORS y middleware
+
+![Configuración CORS](docs/images/ev11/16-cors-configuration.png)
+*Cabeceras CORS en una petición con `Origin`.*
+
+![Cabeceras del middleware](docs/images/ev11/17-middleware-headers.png)
+*`X-Process-Time` y `X-Request-ID` en la respuesta.*
+
+### Rate limiting
+
+![Activación del límite de peticiones](docs/images/ev11/18-rate-limit-429.png)
+*Peticiones repetidas a `POST /auth/login`: 401 hasta la quinta, 429 en adelante.*
+
+![Cabeceras y cuerpo del 429](docs/images/ev11/19-rate-limit-headers.png)
+*Respuesta `429 Too Many Requests` con el cuerpo `{"detail": "..."}` y las cabeceras del middleware.*
 
 ## Evidencias de pruebas (EV10)
 
@@ -967,6 +1032,10 @@ Pruebas funcionales de los seis endpoints y de los escenarios de error, ejecutad
 ![Error 422](docs/images/ev07/09-error-422-validation.png)
 *Datos inválidos: `422 Unprocessable Entity`.*
 
+## Reflexión final sobre seguridad en APIs (EV11)
+
+Proteger `device_systems` significó agregar una capa completa por encima de lo que ya existía: las contraseñas nunca se guardan en texto plano, gracias al hash con `passlib`; la sesión de un usuario se representa con un token JWT que expira, no con estado guardado en el servidor; y cada endpoint declara explícitamente qué rol necesita, con `Depends()` reutilizando el mismo mecanismo de dependencias del resto del proyecto. El middleware centralizó cabeceras que antes vivían repartidas en cada router, y CORS y el rate limiting son la primera línea de defensa contra un cliente mal configurado o un abuso de peticiones. Lo más importante que aprendí es que la seguridad no es una capa aislada: toca la base de datos (la migración), los schemas (validación de contraseñas), las rutas (protección por rol) y la infraestructura (CORS, middleware, límites). [Completa con lo que más te costó o lo que más valoras de esta etapa.]
+
 ## Reflexión final sobre migraciones, relaciones y consultas avanzadas (EV10)
 
 Hasta EV09 la base de datos se creaba de golpe al iniciar la aplicación; con Alembic cada cambio del esquema queda registrado en una migración que se puede aplicar, revisar y revertir, así que la base evoluciona de forma controlada. Relacionar `User`, `Device` y `Loan` con claves foráneas y `relationship()` hizo que la base garantice la integridad: un préstamo siempre pertenece a un usuario y a un dispositivo que existen. Las consultas con `join()` y filtros opcionales permiten obtener en una sola petición los préstamos con su usuario y su dispositivo, y las reglas de negocio (dispositivo disponible, préstamo ya devuelto) se validan antes de modificar los datos, en una sola transacción. [Completa con lo que más te costó o lo que más valoras de esta etapa.]
@@ -983,10 +1052,3 @@ En EV07 la API solo permitía consultar y crear usuarios, con todo el código en
 
 FastAPI permitió construir la API de `users` con poco código: los path y query parameters se declaran como argumentos de las funciones, Pydantic valida los datos de entrada y los `response_model` controlan lo que la API devuelve, todo apoyado en los tipos de Python. Además, la documentación interactiva se genera automáticamente y sirvió para probar cada endpoint sin herramientas externas. [Completa con lo que más te sirvió o te costó aprender.]
 
-## Evidencias de pruebas (EV11) — rate limiting
-
-![Activación del límite de peticiones](docs/images/ev11/01-rate-limit-429.png)
-*Peticiones repetidas a `POST /auth/login`: las primeras cinco responden 401, la sexta en adelante responde 429.*
-
-![Cabeceras y cuerpo del 429](docs/images/ev11/02-rate-limit-headers.png)
-*Respuesta `429 Too Many Requests`, con el cuerpo `{"detail": "..."}` y las cabeceras del middleware.*

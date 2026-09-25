@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class UserRole(StrEnum):
@@ -13,6 +13,19 @@ class UserRole(StrEnum):
 class UserOrderBy(StrEnum):
     NAME = "name"
     CREATED_AT = "created_at"
+
+
+def validate_password_strength(value: str) -> str:
+    """Valida que una contraseña cumpla las reglas mínimas de seguridad."""
+    if any(ch.isspace() for ch in value):
+        raise ValueError("La contraseña no puede contener espacios en blanco")
+    if not any(ch.isupper() for ch in value):
+        raise ValueError("La contraseña debe tener al menos una mayúscula")
+    if not any(ch.islower() for ch in value):
+        raise ValueError("La contraseña debe tener al menos una minúscula")
+    if not any(ch.isdigit() for ch in value):
+        raise ValueError("La contraseña debe tener al menos un número")
+    return value
 
 
 class UserBase(BaseModel):
@@ -37,10 +50,21 @@ class UserCreate(UserBase):
                     "email": "ana@sena.edu.co",
                     "role": "admin",
                     "is_active": True,
+                    "password": "Abcdef12",
                 }
             ]
         }
     )
+
+    password: str = Field(
+        min_length=8,
+        description="Mínimo 8 caracteres, con mayúscula, minúscula y número",
+    )
+
+    @field_validator("password")
+    @classmethod
+    def _validate_password(cls, value: str) -> str:
+        return validate_password_strength(value)
 
 
 class UserResponse(UserBase):

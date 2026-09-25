@@ -313,6 +313,49 @@ Ejemplo de `LoanDetailResponse`:
 }
 ```
 
+## Endpoints de autenticación
+
+| Método | Ruta | Descripción | Cuerpo o cabecera |
+|---|---|---|---|
+| POST | `/auth/register` | Registra un usuario con contraseña segura | Body JSON: `name`, `email`, `password`, `role` (opcional, por defecto `user`) |
+| POST | `/auth/login` | Autentica y devuelve un token JWT | Formulario OAuth2: `username` (correo), `password` |
+| GET | `/auth/me` | Devuelve el usuario autenticado | `Authorization: Bearer <token>` |
+
+### Ejemplos de peticiones
+
+```bash
+curl -X POST http://127.0.0.1:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Ana Pérez", "email": "ana@sena.edu.co", "password": "Abcdef12", "role": "admin"}'
+
+curl -X POST http://127.0.0.1:8000/auth/login \
+  -d "username=ana@sena.edu.co" \
+  -d "password=Abcdef12"
+
+curl http://127.0.0.1:8000/auth/me \
+  -H "Authorization: Bearer <token>"
+```
+
+Respuesta `200 OK` de `POST /auth/login`:
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
+
+### Respuestas de error
+
+| Código | Caso |
+|---|---|
+| 400 Bad Request | El correo ya está registrado |
+| 401 Unauthorized | Correo o contraseña incorrectos, o token ausente / inválido |
+| 422 Unprocessable Entity | Datos inválidos (nombre corto, correo mal formado, contraseña débil) |
+
+`POST /auth/register` es hoy la única forma de crear un usuario con rol `admin`, ya que `POST /users` se protegerá para administradores en el siguiente bloque.
+
+
 ## Endpoints
 
 | Método | Ruta | Descripción | Parámetros |
@@ -550,6 +593,7 @@ Los servicios reciben la sesión de base de datos y ejecutan las consultas con S
 | Préstamo ya devuelto | 409 | `{"detail": "El préstamo ya fue devuelto"}` |
 | Eliminar un usuario o dispositivo con préstamos | 409 | `{"detail": "No se puede eliminar un usuario con préstamos registrados"}` (o dispositivo) |
 | Datos inválidos (formato, rol, contraseña débil, filtros) | 422 | Lista de errores de validación de Pydantic en `detail` |
+| Credenciales incorrectas o token inválido | 401 | `{"detail": "Correo o contraseña incorrectos"}` o `{"detail": "No se pudo validar las credenciales"}` |
 
 ## Dependency Injection con Depends()
 

@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.auth.auth_routes import router as auth_router
+from app.core_limiter import limiter
 
 from contextlib import asynccontextmanager
 
@@ -11,6 +12,11 @@ from app.routes.user_routes import router as user_router
 from app.routes.device_routes import router as device_router
 from app.routes.loan_routes import router as loan_router
 from app.middlewares.request_middleware import RequestContextMiddleware
+
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from app.schemas.error_schema import ErrorResponse
 
 
 tags_metadata = [
@@ -50,6 +56,22 @@ app = FastAPI(
     openapi_tags=tags_metadata,
     lifespan=lifespan,
 )
+
+from fastapi.requests import Request
+from fastapi.responses import JSONResponse
+
+
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content=ErrorResponse(
+            detail="Demasiadas solicitudes. Intenta de nuevo más tarde."
+        ).model_dump(),
+    )
+
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 
 app.add_middleware(
     CORSMiddleware,

@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from app.auth.auth_routes import router as auth_router
 from app.core_limiter import limiter
@@ -13,9 +13,8 @@ from app.routes.device_routes import router as device_router
 from app.routes.loan_routes import router as loan_router
 from app.middlewares.request_middleware import RequestContextMiddleware
 
-from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
+
 from app.schemas.error_schema import ErrorResponse
 
 

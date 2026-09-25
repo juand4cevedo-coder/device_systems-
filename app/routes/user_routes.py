@@ -3,6 +3,10 @@ from typing import Any
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
+from fastapi import Request
+
+from app.core_limiter import limiter
+
 from app.dependencies.auth_dependency import (
     get_current_active_user,
     require_admin,
@@ -39,10 +43,12 @@ router = APIRouter(prefix="/users", tags=["Users"])
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(get_current_active_user)],
     summary="Listar usuarios",
-    description="Devuelve todos los usuarios. Se puede filtrar por rol (`role`) y por estado (`is_active`), combinando ambos filtros, y ordenar por nombre (`name`) o por fecha de creación (`created_at`, el valor por defecto).",
+    description="Devuelve todos los usuarios. Se puede filtrar por rol (`role`) y por estado (`is_active`), combinando ambos filtros, y ordenar por nombre (`name`) o por fecha de creación (`created_at`, el valor por defecto). Límite: 30 solicitudes por minuto.",
     response_description="Lista de usuarios que cumplen los filtros",
 )
+@limiter.limit("30/minute")
 def list_users(
+    request: Request,
     role: UserRole | None = None,
     is_active: bool | None = None,
     order_by: UserOrderBy = UserOrderBy.CREATED_AT,
